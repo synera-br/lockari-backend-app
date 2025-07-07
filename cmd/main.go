@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -13,9 +13,14 @@ func main() {
 	// For example, you might want to start a web server or connect to a database.
 
 	// Example: Start a web server
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "Hello, World!")
+	router := gin.Default()
+	router.GET("/", func(c *gin.Context) {
+		c.String(http.StatusOK, "Hello, Lockari!")
 	})
-	log.Fatal(http.ListenAndServe(":8080", nil))
+
+	// Start the server on port 8080
+	if err := router.Run(":8080"); err != nil {
+		panic("Failed to start server: " + err.Error())
+	}
 
 }
