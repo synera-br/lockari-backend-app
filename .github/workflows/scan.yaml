@@ -35,21 +35,16 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Run GoSec (SAST for Go)
-        uses: securego/gosec@master
-        with:
-          args: './...' # Escaneia todos os pacotes Go no repositório
-          # Formato SARIF para integração com GitHub Security tab
-          # Pode adicionar outros formatos como html, json, etc.
-          output: gosec-results.sarif
-        continue-on-error: true # Permite que o workflow continue mesmo com falhas de segurança leves
-        env:
-          GOS_SARIF_OUTPUT: gosec-results.sarif # Gosec escreve o SARIF aqui
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec -fmt sarif -out gosec-results.sarif ./... || true
+        continue-on-error: true
 
       - name: Upload GoSec SARIF results
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: gosec-results.sarif
-        if: always() # Uploada resultados mesmo que a etapa anterior tenha tido erros
+        if: always() && hashFiles('gosec-results.sarif') != ''
 
       - name: Run Govulncheck (Vulnerability detection for Go modules)
         run: |
