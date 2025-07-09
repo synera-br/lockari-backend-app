@@ -73,14 +73,16 @@ func (h *auditSystemEventHandler) Create(c *gin.Context) {
 	log.Println("Request Headers:", c.Request.Header)
 
 	token := c.GetHeader("X-Token")
-	dataToken, err := h.authClient.ValidateToken(c.Request.Context(), token)
+	h.token.Validate(token)
+
+	dataToken, err := h.token.Validate(token)
 	if err != nil {
 		log.Println("Error validating token:", err)
 		c.JSON(401, gin.H{"error": "Invalid or expired token"})
 		return
 	}
 
-	log.Println("Received token data:", dataToken)
+	log.Println("Received token data:", *dataToken)
 	var body cryptserver.CryptData
 	if err := c.ShouldBindJSON(&body); err != nil {
 		log.Println("Error binding JSON:", err)
