@@ -16,7 +16,7 @@ type UserIDContextKey struct {
 func GetUserID(ctx context.Context) (*string, error) {
 
 	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("context error: %w", err)
+		return nil, fmt.Errorf(ContextError, err.Error())
 	}
 
 	userIDFromCtx := ctx.Value("UserID")
@@ -42,7 +42,7 @@ func GetUserID(ctx context.Context) (*string, error) {
 
 func GetTokenFromContext(ctx context.Context, auth authenticator.Authenticator) (string, error) {
 	if err := ctx.Err(); err != nil {
-		return "", fmt.Errorf("context error: %w", err)
+		return "", fmt.Errorf(ContextError, err.Error())
 	}
 	tokenFromCtx := ctx.Value("token")
 	if tokenFromCtx == nil {
@@ -51,7 +51,7 @@ func GetTokenFromContext(ctx context.Context, auth authenticator.Authenticator) 
 
 	_, err := auth.ValidateToken(ctx, tokenFromCtx.(string))
 	if err != nil {
-		return "", fmt.Errorf("invalid token: %w", err)
+		return "", fmt.Errorf("invalid token: %s", err.Error())
 	}
 
 	return tokenFromCtx.(string), nil
@@ -59,7 +59,7 @@ func GetTokenFromContext(ctx context.Context, auth authenticator.Authenticator) 
 
 func GetAuthorizationFromContext(ctx context.Context) (string, error) {
 	if err := ctx.Err(); err != nil {
-		return "", fmt.Errorf("context error: %w", err)
+		return "", fmt.Errorf(ContextError, err.Error())
 	}
 
 	authFromCtx := ctx.Value("Authorization")
@@ -81,7 +81,7 @@ func GetAuthorizationFromContext(ctx context.Context) (string, error) {
 
 func GetUserIDFromContext(ctx context.Context) (string, error) {
 	if err := ctx.Err(); err != nil {
-		return "", fmt.Errorf("context error: %w", err)
+		return "", fmt.Errorf(ContextError, err.Error())
 	}
 
 	userIDFromCtx := ctx.Value("UserID")

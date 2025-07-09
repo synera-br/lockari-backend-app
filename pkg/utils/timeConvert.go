@@ -2,6 +2,10 @@ package utils
 
 import "time"
 
+const (
+	layout = "2006-01-02"
+)
+
 func ConvertStringToTime(format string, dateStr string) (time.Time, error) {
 	// Parse the date string into a time.Time object
 	t, err := time.Parse(format, dateStr)
@@ -20,7 +24,7 @@ func ConvertTimeToString(format string, date time.Time) string {
 
 func ConvertTimeToISO8601(date time.Time) string {
 	// Format the time.Time object to a string in ISO 8601 format (YYYY-MM-DD)
-	return date.Format("2006-01-02")
+	return date.Format(layout)
 }
 
 func ConvertISO8601ToTime(dateStr string) (time.Time, error) {
@@ -131,7 +135,7 @@ func ConvertRFC3339ToYYYYMMDD(rfc3339Str string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return t.Format("2006-01-02"), nil
+	return t.Format(layout), nil
 }
 
 // ConvertRFC3339ToDateFormat converts RFC3339 timestamp directly to YYYY-MM-DD format
@@ -147,11 +151,11 @@ func ConvertRFC3339ToDateFormat(rfc3339Str string) (string, error) {
 		}
 	}
 	// Force YYYY-MM-DD format
-	return t.Format("2006-01-02"), nil
+	return t.Format(layout), nil
 }
 
 // ConvertTimeToDateFormat converts time.Time directly to YYYY-MM-DD format
 // Example: time.Time → "2025-07-03"
 func ConvertTimeToDateFormat(t time.Time) string {
-	return t.Format("2006-01-02")
+	return t.Format(layout)
 }

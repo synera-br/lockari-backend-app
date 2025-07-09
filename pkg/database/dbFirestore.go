@@ -65,16 +65,16 @@ func InitializeFirebaseDB(config FirebaseConfig) (FirebaseDBInterface, error) {
 func (db *FirebaseDB) connect(cfg FirebaseConfig) error {
 
 	if cfg.ProjectID == "" {
-		return fmt.Errorf("ProjectID is required for Firebase connection")
+		return errors.New(errorProjectIDRequired)
+	}
+
+	if db.client != nil {
+		return errors.New(errorClientNotInitialized)
 	}
 
 	var opt option.ClientOption
 	if cfg.ServiceAccountKeyPath != "" {
 		opt = option.WithCredentialsFile(cfg.ServiceAccountKeyPath)
-	} else {
-		// If no credentials file is provided, Firestore client will try to use
-		// Application Default Credentials (ADC) if available.
-		log.Println("Firebase CredentialsFile not provided, attempting to use Application Default Credentials.")
 	}
 
 	databaseName := "default"
@@ -91,7 +91,7 @@ func (db *FirebaseDB) connect(cfg FirebaseConfig) error {
 		opt,
 	)
 	if err != nil {
-		return fmt.Errorf("firestore.NewClientWithDatabase: %w", err)
+		return fmt.Errorf(errorNotConnected, err.Error())
 	}
 
 	db.client = client
@@ -110,11 +110,10 @@ func (db *FirebaseDB) connect(cfg FirebaseConfig) error {
 func (db *FirebaseDB) Get(ctx context.Context, collection string) ([]byte, error) {
 	// Placeholder: A real implementation would specify the collection.
 	if db.client == nil {
-		return nil, errors.New("firestore client not initialized. Call Connect first")
+		return nil, errors.New(errorClientNotInitialized)
 	}
 
 	if err := db.validateWithoutData(ctx, collection); err != nil {
-		log.Println(" erro na validação", err)
 		return nil, err
 	}
 
@@ -177,7 +176,7 @@ func (db *FirebaseDB) Create(ctx context.Context, data interface{}, collection s
 // Placeholder: Collection name needed.
 func (db *FirebaseDB) Update(ctx context.Context, id string, data interface{}, collection string) error {
 	if db.client == nil {
-		return fmt.Errorf("firestore client not initialized. Call Connect first")
+		return fmt.Errorf(errorClientNotInitialized)
 	}
 
 	// Check if data is a map and if "updatedAt" is present.
@@ -208,10 +207,10 @@ func (db *FirebaseDB) Update(ctx context.Context, id string, data interface{}, c
 // Placeholder: Collection name needed.
 func (db *FirebaseDB) Delete(ctx context.Context, id, collection string) error {
 	if db.client == nil {
-		return fmt.Errorf("firestore client not initialized. Call Connect first")
+		return errors.New(errorClientNotInitialized)
 	}
 	if id == "" {
-		return fmt.Errorf("id is empty")
+		return fmt.Errorf(errorGenericError, "id is empty")
 	}
 
 	if err := db.validateWithoutData(ctx, collection); err != nil {
@@ -240,21 +239,29 @@ func (db *FirebaseDB) GetByConditional(ctx context.Context, conditional []Condit
 		return nil, err
 	}
 
+	if db.client == nil {
+		return nil, errors.New(errorClientNotInitialized)
+	}
+
+	if len(conditional) == 0 {
+		return nil, errors.New(errorConditionalRequired)
+	}
+
 	query := db.client.Collection(collection).Query
 	for _, cond := range conditional {
 		if cond.Field == "" {
-			return nil, fmt.Errorf("field in conditional cannot be empty")
+			return nil, errors.New(errorConditionalFieldRequired)
 		}
 		if cond.Value == nil {
-			return nil, fmt.Errorf("value in conditional cannot be nil")
+			return nil, errors.New(errorConditionalValueRequired)
 		}
 		if cond.Filter == "" {
-			return nil, fmt.Errorf("filter in conditional cannot be empty")
+			return nil, errors.New(errorConditionalFilterRequired)
 		}
 		if cond.Filter != FilterEquals && cond.Filter != FilterNotEquals &&
 			cond.Filter != FilterGreaterThan && cond.Filter != FilterLessThan &&
 			cond.Filter != FilterArrayContains {
-			return nil, fmt.Errorf("invalid filter type: %s", cond.Filter)
+			return nil, fmt.Errorf(errorGenericError, "invalid filter operator")
 		}
 
 		query = query.Where(cond.Field, string(cond.Filter), cond.Value)
@@ -329,13 +336,11 @@ func (db *FirebaseDB) Close() error {
 	if db.client != nil {
 		err := db.client.Close()
 		if err != nil {
-			return fmt.Errorf("error closing Firestore client: %w", err)
+			return fmt.Errorf(errorToCloseConnection, err.Error())
 		}
-		db.client = nil
-		log.Println("Firebase Firestore connection closed.")
 		return nil
 	}
-	return errors.New("firestore client not initialized or already closed")
+	return errors.New(errorNotInitialized)
 }
 
 func (db *FirebaseDB) IsConnected() bool {
@@ -345,7 +350,7 @@ func (db *FirebaseDB) IsConnected() bool {
 // validateWithData
 func (db *FirebaseDB) validateWithData(ctx context.Context, data interface{}, collection string) error {
 	if db.client == nil {
-		return errors.New("firestore client not initialized. Call Connect first")
+		return errors.New(errorNotInitialized)
 	}
 
 	if data == nil {
@@ -353,11 +358,11 @@ func (db *FirebaseDB) validateWithData(ctx context.Context, data interface{}, co
 	}
 
 	if collection == "" {
-		return errors.New("collection is empty")
+		return errors.New(errorCollectionRequired)
 	}
 
 	if ctx.Value("Authorization") == "" {
-		return errors.New("authorization token is nil")
+		return errors.New(errorAuthorizationTokenRequired)
 	}
 	return nil
 }
@@ -365,11 +370,11 @@ func (db *FirebaseDB) validateWithData(ctx context.Context, data interface{}, co
 // validateWithoutData
 func (db *FirebaseDB) validateWithoutData(ctx context.Context, collection string) error {
 	if db.client == nil {
-		return errors.New("firestore client not initialized. Call Connect first")
+		return errors.New(errorNotInitialized)
 	}
 
 	if collection == "" {
-		return errors.New("collection is empty")
+		return errors.New(errorCollectionRequired)
 	}
 
 	if ctx.Value("Authorization") == "" {
@@ -382,7 +387,7 @@ func (db *FirebaseDB) StructToData(data interface{}) (map[string]interface{}, er
 	var result map[string]interface{}
 
 	if data == nil {
-		return nil, errors.New("input data is nil")
+		return nil, fmt.Errorf(errorGenericError, "data is nil")
 	}
 
 	jsonData, err := json.Marshal(data)
@@ -399,7 +404,7 @@ func (db *FirebaseDB) StructToData(data interface{}) (map[string]interface{}, er
 		result = make(map[string]interface{})
 	}
 	if len(result) == 0 {
-		return nil, errors.New("converted map is empty")
+		return nil, fmt.Errorf(errorGenericError, "resulting map is empty after unmarshalling")
 	}
 
 	return result, nil

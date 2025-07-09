@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/synera-br/lockari-backend-app/pkg/utils"
 )
 
 // Crypt interface defines the methods for cryptographic operations
@@ -64,11 +66,11 @@ func (cd *CryptData) GenerateKey() ([]byte, error) {
 // EncryptData encrypts the given data using AES-GCM encryption
 func (cd *CryptData) EncryptData(data interface{}) ([]byte, error) {
 	if cd.EncryptionKey == nil {
-		return nil, errors.New("encryption key not set")
+		return nil, fmt.Errorf(utils.EncryptionError, "cannot be nil")
 	}
 
 	if len(cd.EncryptionKey) == 0 {
-		return nil, errors.New("encryption key not set")
+		return nil, fmt.Errorf(utils.EncryptionError, "cannot be empty")
 	}
 
 	// Convert data to JSON bytes
@@ -118,11 +120,11 @@ func (cd *CryptData) EncryptData(data interface{}) ([]byte, error) {
 // DecryptData decrypts the given data using AES-GCM decryption
 func (cd *CryptData) DecryptData(data []byte) ([]byte, error) {
 	if cd.EncryptionKey == nil {
-		return nil, errors.New("encryption key not set")
+		return nil, fmt.Errorf(utils.DecryptionError, "cannot be nil")
 	}
 
 	if len(cd.EncryptionKey) == 0 {
-		return nil, errors.New("encryption key not set")
+		return nil, fmt.Errorf(utils.DecryptionError, "cannot be empty")
 	}
 
 	// Decode hex string

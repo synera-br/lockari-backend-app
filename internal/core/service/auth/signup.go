@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	entity "github.com/synera-br/lockari-backend-app/internal/core/entity/auth"
@@ -38,7 +39,7 @@ func (s *SignupEvent) Create(ctx context.Context, signup entity.SignupEvent) (en
 	}
 
 	if ctx.Err() != nil {
-		return nil, core.ErrGenericError("Context cancelled")
+		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
 	}
 
 	token, err := utils.GetTokenFromContext(ctx, s.auth) // Ensure user ID is retrieved from context
@@ -49,7 +50,7 @@ func (s *SignupEvent) Create(ctx context.Context, signup entity.SignupEvent) (en
 	user := signup.GetUser()
 	userFromToken, err := s.auth.GetUserID(ctx, token)
 	if err != nil {
-		return nil, core.ErrUnauthorized("Failed to retrieve user ID from token")
+		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
 	}
 
 	if userFromToken != user.Uid {
@@ -107,7 +108,7 @@ func (s *SignupEvent) Create(ctx context.Context, signup entity.SignupEvent) (en
 func (s *SignupEvent) Get(ctx context.Context, id string) (entity.SignupEvent, error) {
 
 	if ctx.Err() != nil {
-		return nil, core.ErrGenericError("Context cancelled")
+		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
 	}
 
 	if id == "" {
@@ -121,7 +122,7 @@ func (s *SignupEvent) Get(ctx context.Context, id string) (entity.SignupEvent, e
 
 	userFromToken, err := s.auth.GetUserID(ctx, token)
 	if err != nil {
-		return nil, core.ErrUnauthorized("Failed to retrieve user ID from token")
+		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
 	}
 
 	// Buscar o signup event primeiro
@@ -146,7 +147,7 @@ func (s *SignupEvent) Get(ctx context.Context, id string) (entity.SignupEvent, e
 
 func (s *SignupEvent) List(ctx context.Context) ([]entity.SignupEvent, error) {
 	if ctx.Err() != nil {
-		return nil, core.ErrGenericError("Context cancelled")
+		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
 	}
 
 	token, err := utils.GetTokenFromContext(ctx, s.auth)
@@ -156,7 +157,7 @@ func (s *SignupEvent) List(ctx context.Context) ([]entity.SignupEvent, error) {
 
 	userFromToken, err := s.auth.GetUserID(ctx, token)
 	if err != nil {
-		return nil, core.ErrUnauthorized("Failed to retrieve user ID from token")
+		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
 	}
 
 	filter := database.Conditional{
