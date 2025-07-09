@@ -72,6 +72,9 @@ func (h *auditSystemEventHandler) setupRoutes(routerGroup *gin.RouterGroup, midd
 
 func (h *auditSystemEventHandler) Create(c *gin.Context) {
 
+	log.Println("Handling audit event creation...")
+	log.Println("Request Headers:", c.Request.Header)
+
 	token := c.GetHeader("X-Token")
 	dataToken, err := h.authClient.ValidateToken(c.Request.Context(), token)
 	if err != nil {
