@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/synera-br/lockari-backend-app/config"
@@ -19,6 +20,7 @@ import (
 	"github.com/synera-br/lockari-backend-app/pkg/database"
 	httpserver "github.com/synera-br/lockari-backend-app/pkg/http_server"
 	"github.com/synera-br/lockari-backend-app/pkg/message_queue"
+	"github.com/synera-br/lockari-backend-app/pkg/tokengen"
 )
 
 func main() {
@@ -54,6 +56,11 @@ func main() {
 	}
 	defer mq.Close()
 
+	token, err := initializeJWT(cfg.Fields["token"].(map[string]interface{}))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	authSvc, err := initializeAuth(db)
 	if err != nil {
 		log.Fatal(err)
@@ -64,8 +71,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	webhandler.InitializeLoginHandler(authSvc, crypt, authClient, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
-	webhandler.InitializeSignupHandler(signup, crypt, authClient, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
+	webhandler.InitializeLoginHandler(authSvc, crypt, authClient, token, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
+	webhandler.InitializeSignupHandler(signup, crypt, authClient, token, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
 	log.Println(cacheClient, signup)
 	log.Println("Starting Lockari Backend App...")
 
@@ -166,6 +173,21 @@ func initializeMessageQueue(fields map[string]interface{}) (message_queue.Messag
 	}
 
 	return mq, nil
+}
+
+func initializeJWT(fields map[string]interface{}) (tokengen.TokenGenerator, error) {
+
+	token := tokengen.NewTokenGenerator(
+		fields["secret"].(string),
+		fields["issuer"].(string),
+		time.Duration(time.Hour*4),
+	)
+
+	if token == nil {
+		return nil, fmt.Errorf("failed to initialize token generator: token secret or issuer is empty")
+	}
+
+	return token, nil
 }
 
 func initializeAuth(db database.FirebaseDBInterface) (entity.LoginEventService, error) {

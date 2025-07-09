@@ -8,12 +8,14 @@ import (
 	mid "github.com/synera-br/lockari-backend-app/internal/handler/middleware"
 	"github.com/synera-br/lockari-backend-app/pkg/authenticator"
 	cryptserver "github.com/synera-br/lockari-backend-app/pkg/crypt/crypt_server"
+	"github.com/synera-br/lockari-backend-app/pkg/tokengen"
 )
 
 type signupHandler struct {
 	svc        entity.SignupEventService
 	encryptor  cryptserver.CryptDataInterface
 	authClient authenticator.Authenticator
+	token      tokengen.TokenGenerator
 }
 
 type SignupHandlerInterface interface {
@@ -27,6 +29,7 @@ func InitializeSignupHandler(
 	svc entity.SignupEventService,
 	encryptData cryptserver.CryptDataInterface,
 	authClient authenticator.Authenticator,
+	token tokengen.TokenGenerator,
 	routerGroup *gin.RouterGroup,
 	middleware ...gin.HandlerFunc,
 ) SignupHandlerInterface {
@@ -34,6 +37,7 @@ func InitializeSignupHandler(
 		svc:        svc,
 		encryptor:  encryptData,
 		authClient: authClient,
+		token:      token,
 	}
 
 	handler.setupRoutes(routerGroup, middleware...)
@@ -52,14 +56,16 @@ func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...
 	signupRoutes.GET("", h.List)
 	signupRoutes.GET("/:id", h.Get)
 
+	withoutAuth := routerGroup.Group("/auth/signup")
+	withoutAuth.POST("/api/v1/audit/auth", h.WithJWT)
+	withoutAuth.POST("/audit/auth", h.WithJWT)
+
 	extra := routerGroup.Group("/")
 	for _, mw := range middleware {
 		extra.Use(mw)
 	}
 	extra.GET("/api/v1/audit/auth", h.Extras)
 	extra.GET("/audit/auth", h.Extras)
-	extra.POST("/api/v1/audit/auth", h.Extras)
-	extra.POST("/audit/auth", h.Extras)
 
 }
 
@@ -99,4 +105,42 @@ func (h *signupHandler) Extras(c *gin.Context) {
 	log.Println("Decrypted data:", string(decryptedData))
 
 	c.JSON(200, gin.H{"message": "Extras handled successfully"})
+}
+
+func (h *signupHandler) WithJWT(c *gin.Context) {
+	log.Println("Handling signup with JWT...")
+
+	// Exemplo de geração de token normal
+	claims := tokengen.TokenClaims{
+		AppID: "lockari-frontend-app",
+		Scope: []string{"signup", "read"},
+		Metadata: map[string]interface{}{
+			"type": "signup",
+		},
+	}
+
+	nonExpiringToken, err := h.token.GenerateNonExpiring(claims)
+	if err != nil {
+		log.Printf("Error generating non-expiring token: %v", err)
+		c.JSON(500, gin.H{"error": "Failed to generate non-expiring token"})
+		return
+	}
+
+	validatedClaims, err := h.token.Validate(nonExpiringToken)
+	if err != nil {
+		log.Printf("Non-expiring token validation failed: %v", err)
+	} else {
+		log.Printf("Non-expiring token valid for user: %s, NonExpiring: %v",
+			validatedClaims.UserID, validatedClaims.NonExpiring)
+	}
+
+	// Verificar se tokens expiram
+	log.Printf("Non-expiring token expired: %v", h.token.IsExpired(nonExpiringToken))
+
+	c.JSON(200, gin.H{
+		"message": "JWT tokens generated successfully",
+		"tokens": map[string]interface{}{
+			"non_expiring": nonExpiringToken,
+		},
+	})
 }

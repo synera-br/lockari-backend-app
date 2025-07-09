@@ -13,12 +13,14 @@ import (
 	"github.com/synera-br/lockari-backend-app/internal/handler/web"
 	"github.com/synera-br/lockari-backend-app/pkg/authenticator"
 	cryptserver "github.com/synera-br/lockari-backend-app/pkg/crypt/crypt_server"
+	"github.com/synera-br/lockari-backend-app/pkg/tokengen"
 )
 
 type loginHandler struct {
 	svc        entity.LoginEventService
 	encryptor  cryptserver.CryptDataInterface
 	authClient authenticator.Authenticator
+	token      tokengen.TokenGenerator
 }
 
 type LoginHandlerInterface interface {
@@ -31,6 +33,7 @@ func InitializeLoginHandler(
 	svc entity.LoginEventService,
 	encryptData cryptserver.CryptDataInterface,
 	authClient authenticator.Authenticator,
+	token tokengen.TokenGenerator,
 	routerGroup *gin.RouterGroup,
 	middleware ...gin.HandlerFunc,
 ) LoginHandlerInterface {
@@ -38,6 +41,7 @@ func InitializeLoginHandler(
 		svc:        svc,
 		encryptor:  encryptData,
 		authClient: authClient,
+		token:      token,
 	}
 
 	handler.setupRoutes(routerGroup, middleware...)
