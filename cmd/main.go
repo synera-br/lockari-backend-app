@@ -9,11 +9,20 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/synera-br/lockari-backend-app/config"
+
+	// AUhtneitcation
 	entity "github.com/synera-br/lockari-backend-app/internal/core/entity/auth"
 	entity_auth "github.com/synera-br/lockari-backend-app/internal/core/entity/auth"
 	repo_auth "github.com/synera-br/lockari-backend-app/internal/core/repository/auth"
 	svc_auth "github.com/synera-br/lockari-backend-app/internal/core/service/auth"
 	webhandler "github.com/synera-br/lockari-backend-app/internal/handler/web/auth"
+
+	// AUDIT
+	entity_audit "github.com/synera-br/lockari-backend-app/internal/core/entity/audit"
+	repo_audit "github.com/synera-br/lockari-backend-app/internal/core/repository/audit"
+	svc_audit "github.com/synera-br/lockari-backend-app/internal/core/service/audit"
+	webhandler_audit "github.com/synera-br/lockari-backend-app/internal/handler/web/audit"
+
 	"github.com/synera-br/lockari-backend-app/pkg/authenticator"
 	"github.com/synera-br/lockari-backend-app/pkg/cache"
 	cryptserver "github.com/synera-br/lockari-backend-app/pkg/crypt/crypt_server"
@@ -71,8 +80,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	auditSvc, err := initializeAuditEvent(db, authClient)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	webhandler.InitializeLoginHandler(authSvc, crypt, authClient, token, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
 	webhandler.InitializeSignupHandler(signup, crypt, authClient, token, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
+	webhandler_audit.InicializeAuditSystemEventHandler(auditSvc, crypt, authClient, token, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
+
 	log.Println(cacheClient, signup)
 	log.Println("Starting Lockari Backend App...")
 
@@ -218,4 +234,19 @@ func initializeSignup(db database.FirebaseDBInterface, auth authenticator.Authen
 	}
 
 	return svc, nil
+}
+
+func initializeAuditEvent(db database.FirebaseDBInterface, auth authenticator.Authenticator) (entity_audit.AuditSystemEventService, error) {
+	repo, err := repo_audit.InicializeAuditSystemEventRepository(db)
+	if err != nil {
+		return nil, err
+	}
+
+	svc, err := svc_audit.InitializeAuditSystemEventService(repo, auth)
+	if err != nil {
+		return nil, err
+	}
+
+	return svc, nil
+
 }
