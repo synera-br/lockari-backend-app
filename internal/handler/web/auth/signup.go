@@ -52,8 +52,7 @@ func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...
 	signupRoutes.GET("", h.List)
 	signupRoutes.GET("/:id", h.Get)
 
-	extra := routerGroup.Group("/auth/signup")
-
+	extra := routerGroup.Group("/")
 	for _, mw := range middleware {
 		extra.Use(mw)
 	}
