@@ -77,7 +77,7 @@ func (h *auditSystemEventHandler) Create(c *gin.Context) {
 	token := c.GetHeader("X-Token")
 	h.token.Validate(token)
 
-	token, err := h.token.Validate(token)
+	_, err := h.token.Validate(token)
 	if err != nil {
 		log.Println("Error validating token:", err)
 		c.JSON(401, gin.H{"error": "Invalid or expired token"})
