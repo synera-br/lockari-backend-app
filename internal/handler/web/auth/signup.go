@@ -138,6 +138,7 @@ func (h *signupHandler) WithJWT(c *gin.Context) {
 
 	// Verificar se tokens expiram
 	log.Printf("Non-expiring token expired: %v", h.token.IsExpired(nonExpiringToken))
+	log.Println("Non-expiring token:", nonExpiringToken)
 
 	c.JSON(200, gin.H{
 		"message": "JWT tokens generated successfully",
