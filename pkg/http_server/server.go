@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -82,10 +81,6 @@ func (s *RestAPI) MiddlewareHeader(c *gin.Context) {
 		c.AbortWithStatus(401)
 		return
 	}
-
-	log.Println("Authorization Header:", authorization)
-	log.Println("Token Header:", token)
-	log.Println("App Header:", app)
 	c.Next()
 }
 
