@@ -80,5 +80,23 @@ func (h *signupHandler) List(c *gin.Context) {
 func (h *signupHandler) Extras(c *gin.Context) {
 	log.Println("Handling extras for signup...")
 	log.Println(c.Request.Header)
+
+	var body cryptserver.CryptData
+	if err := c.ShouldBindJSON(&body); err != nil {
+		log.Println("Error binding JSON:", err)
+		c.JSON(400, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	log.Println("Received payload:", body)
+	decryptedData, err := h.encryptor.PayloadData(body.Payload)
+	if err != nil {
+		log.Println("Error decrypting payload:", err)
+		c.JSON(400, gin.H{"error": "Error processing request data"})
+		return
+	}
+
+	log.Println("Decrypted data:", string(decryptedData))
+
 	c.JSON(200, gin.H{"message": "Extras handled successfully"})
 }
