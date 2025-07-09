@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	entity "github.com/synera-br/lockari-backend-app/internal/core/entity/auth"
+	mid "github.com/synera-br/lockari-backend-app/internal/handler/middleware"
 	"github.com/synera-br/lockari-backend-app/internal/handler/web"
 	"github.com/synera-br/lockari-backend-app/pkg/authenticator"
 	cryptserver "github.com/synera-br/lockari-backend-app/pkg/crypt/crypt_server"
@@ -46,9 +47,10 @@ func InitializeLoginHandler(
 func (h *loginHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...gin.HandlerFunc) {
 
 	loginRoutes := routerGroup.Group("/auth/login")
-	// for _, mw := range middleware {
-	// 	loginRoutes.Use(mw)
-	// }
+	middleware = append(middleware, mid.ValidateToken(&gin.Context{}, h.authClient))
+	for _, mw := range middleware {
+		loginRoutes.Use(mw)
+	}
 
 	loginRoutes.POST("", h.Create)
 	loginRoutes.GET("", h.List)

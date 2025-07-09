@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	entity "github.com/synera-br/lockari-backend-app/internal/core/entity/auth"
+	mid "github.com/synera-br/lockari-backend-app/internal/handler/middleware"
 	"github.com/synera-br/lockari-backend-app/pkg/authenticator"
 	cryptserver "github.com/synera-br/lockari-backend-app/pkg/crypt/crypt_server"
 )
@@ -41,6 +42,7 @@ func InitializeSignupHandler(
 func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...gin.HandlerFunc) {
 
 	signupRoutes := routerGroup.Group("/auth/signup")
+	middleware = append(middleware, mid.ValidateToken(&gin.Context{}, h.authClient))
 	for _, mw := range middleware {
 		signupRoutes.Use(mw)
 	}

@@ -12,19 +12,6 @@ import (
 	"google.golang.org/api/option"
 )
 
-// Authenticator defines the interface for authentication operations.
-type Authenticator interface {
-	ValidateToken(ctx context.Context, userID string, authToken string) (map[string]interface{}, error)
-	IsExpired(ctx context.Context, authToken string) (bool, error)
-	IsValid(ctx context.Context, authToken string) (bool, error)
-	DebugToken(ctx context.Context, authToken string) (map[string]interface{}, error)
-}
-
-// firebaseAuthenticator implements the Authenticator interface using Firebase.
-type firebaseAuthenticator struct {
-	client *auth.Client
-}
-
 // Custom errors for better error handling
 var (
 	ErrEmptyUserID    = errors.New("userID cannot be empty")
@@ -49,6 +36,26 @@ type FirebaseConfig struct {
 	StorageBucket     string      `json:"storageBucket" yaml:"storageBucket"`
 	MessagingSenderID interface{} `json:"messagingSenderId,omitempty" yaml:"messagingSenderId,omitempty"`
 	AppID             string      `json:"appId" yaml:"appId"`
+}
+
+// Authenticator defines the interface for authentication operations.
+type Authenticator interface {
+	ValidateToken(ctx context.Context, authToken string) (map[string]interface{}, error)
+	IsExpired(ctx context.Context, authToken string) (bool, error)
+	IsValid(ctx context.Context, authToken string) (bool, error)
+	DebugToken(ctx context.Context, authToken string) (map[string]interface{}, error)
+	GetTenant(ctx context.Context, authToken string) (string, error)
+	GetUserID(ctx context.Context, authToken string) (string, error)
+	GetUserEmail(ctx context.Context, authToken string) (string, error)
+	GetUserName(ctx context.Context, authToken string) (string, error)
+	SetTenantId(ctx context.Context, uid string, tenantId string) error
+	SetCustomClaims(ctx context.Context, uid string, roles map[string]interface{}) error
+	SetTenantRollback(ctx context.Context, uid string, tenantId string) error
+}
+
+// firebaseAuthenticator implements the Authenticator interface using Firebase.
+type firebaseAuthenticator struct {
+	client *auth.Client
 }
 
 // InitializeAuth initializes the Firebase application and returns an Authenticator.
@@ -98,12 +105,185 @@ func InitializeAuth(ctx context.Context, config *FirebaseConfig) (Authenticator,
 	return &firebaseAuthenticator{client: client}, nil
 }
 
-// ValidateToken validates the Firebase ID token and ensures it belongs to the specified user.
-func (fa *firebaseAuthenticator) ValidateToken(ctx context.Context, userID string, authToken string) (map[string]interface{}, error) {
-	// Input validation
-	if userID == "" {
-		return nil, ErrEmptyUserID
+func (fa *firebaseAuthenticator) GetTenant(ctx context.Context, authToken string) (string, error) {
+	if authToken == "" {
+		return "", ErrEmptyToken
 	}
+	if fa.client == nil {
+		return "", ErrClientNotInit
+	}
+
+	user, err := fa.client.GetUser(ctx, authToken)
+	if err != nil {
+		return "", fmt.Errorf("error getting user: %w", err)
+	}
+
+	if user == nil || user.CustomClaims == nil {
+		return "", errors.New("user or tenant ID not found")
+	}
+
+	tenantId, ok := user.CustomClaims["tenantId"]
+	if !ok {
+		return "", errors.New("tenant ID not found in user claims")
+	}
+
+	if tenantId == nil {
+		return "", errors.New("tenant ID is nil")
+	}
+
+	if tenantIdStr, ok := tenantId.(string); ok && tenantIdStr == "" {
+		return "", errors.New("tenant ID is empty")
+	}
+
+	return tenantId.(string), nil
+}
+
+func (fa *firebaseAuthenticator) GetUserID(ctx context.Context, authToken string) (string, error) {
+	if authToken == "" {
+		return "", ErrEmptyToken
+	}
+	if fa.client == nil {
+		return "", ErrClientNotInit
+	}
+
+	user, err := fa.client.GetUser(ctx, authToken)
+	if err != nil {
+		return "", fmt.Errorf("error getting user: %w", err)
+	}
+
+	return user.UID, nil
+}
+
+func (fa *firebaseAuthenticator) GetUserEmail(ctx context.Context, authToken string) (string, error) {
+	if authToken == "" {
+		return "", ErrEmptyToken
+	}
+	if fa.client == nil {
+		return "", ErrClientNotInit
+	}
+
+	user, err := fa.client.GetUser(ctx, authToken)
+	if err != nil {
+		return "", fmt.Errorf("error getting user: %w", err)
+	}
+
+	if user == nil || user.Email == "" {
+		return "", errors.New("user or email not found")
+	}
+
+	return user.Email, nil
+}
+
+func (fa *firebaseAuthenticator) GetUserName(ctx context.Context, authToken string) (string, error) {
+	if authToken == "" {
+		return "", ErrEmptyToken
+	}
+	if fa.client == nil {
+		return "", ErrClientNotInit
+	}
+
+	user, err := fa.client.GetUser(ctx, authToken)
+	if err != nil {
+		return "", fmt.Errorf("error getting user: %w", err)
+	}
+
+	if user == nil || user.DisplayName == "" {
+		return "", errors.New("user or name not found")
+	}
+
+	return user.DisplayName, nil
+}
+
+func (fa *firebaseAuthenticator) SetTenantId(ctx context.Context, uid string, tenantId string) error {
+	if fa.client == nil {
+		return ErrClientNotInit
+	}
+
+	if uid == "" {
+		return ErrEmptyToken
+	}
+
+	if tenantId == "" {
+		return errors.New("tenantId cannot be empty")
+	}
+
+	// Set custom user claims with tenantId
+	claims := map[string]interface{}{
+		"tenantId": tenantId,
+	}
+
+	err := fa.client.SetCustomUserClaims(ctx, uid, claims)
+	if err != nil {
+		log.Printf("Error setting custom user claims: %v", err)
+		return fmt.Errorf("error setting custom user claims: %w", err)
+	}
+
+	log.Printf("Successfully set tenant ID for user %s: %s", uid, tenantId)
+
+	return nil
+}
+
+func (fa *firebaseAuthenticator) SetTenantRollback(ctx context.Context, uid string, tenantId string) error {
+	if fa.client == nil {
+		return ErrClientNotInit
+	}
+
+	if uid == "" {
+		return ErrEmptyToken
+	}
+
+	// Set custom user claims with tenantId
+	claims := map[string]interface{}{
+		"tenantId": tenantId,
+	}
+
+	err := fa.client.SetCustomUserClaims(ctx, uid, claims)
+	if err != nil {
+		log.Printf("Error setting custom user claims: %v", err)
+		return fmt.Errorf("error setting custom user claims: %w", err)
+	}
+
+	log.Printf("Successfully set tenant ID for user %s: %s", uid, tenantId)
+
+	return nil
+}
+
+func (fa *firebaseAuthenticator) SetCustomClaims(ctx context.Context, uid string, roles map[string]interface{}) error {
+	if fa.client == nil {
+		return ErrClientNotInit
+	}
+
+	if _, err := fa.GetUserID(ctx, uid); err != nil {
+		return err
+	}
+
+	if _, err := fa.GetTenant(ctx, uid); err != nil {
+		return errors.New("tenantId cannot be empty")
+	}
+
+	if len(roles) < 1 {
+		return errors.New("roles cannot be empty")
+	}
+
+	claims := map[string]interface{}{}
+	if roles != nil {
+		claims["roles"] = roles
+	}
+
+	err := fa.client.SetCustomUserClaims(ctx, uid, claims)
+	if err != nil {
+		log.Printf("Error setting custom user claims: %v", err)
+		return fmt.Errorf("error setting custom user claims: %w", err)
+	}
+
+	log.Printf("Successfully set custom claims for user %s. Role: %s", uid, roles)
+
+	return nil
+}
+
+// ValidateToken validates the Firebase ID token and ensures it belongs to the specified user.
+func (fa *firebaseAuthenticator) ValidateToken(ctx context.Context, authToken string) (map[string]interface{}, error) {
+	// Input validation
 	if authToken == "" {
 		return nil, ErrEmptyToken
 	}
@@ -129,10 +309,8 @@ func (fa *firebaseAuthenticator) ValidateToken(ctx context.Context, userID strin
 		return nil, ErrUIDNotFound
 	}
 
-	// Validate UID matches
-	if tokenUID != userID {
-		return nil, fmt.Errorf("%w: token UID (%s) does not match provided userID (%s)",
-			ErrUserIDMismatch, tokenUID, userID)
+	if verifiedToken.Subject == "" {
+		return nil, ErrUIDNotFound
 	}
 
 	return claims, nil

@@ -3,7 +3,15 @@ package utils
 import (
 	"context"
 	"fmt"
+
+	"firebase.google.com/go/v4/auth"
+	"github.com/synera-br/lockari-backend-app/pkg/authenticator"
 )
+
+type UserIDContextKey struct {
+	auth.UserProvider
+	Token string
+}
 
 func GetUserID(ctx context.Context) (*string, error) {
 
@@ -30,4 +38,65 @@ func GetUserID(ctx context.Context) (*string, error) {
 	}
 
 	return &userID, nil
+}
+
+func GetTokenFromContext(ctx context.Context, auth authenticator.Authenticator) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", fmt.Errorf("context error: %w", err)
+	}
+	tokenFromCtx := ctx.Value("token")
+	if tokenFromCtx == nil {
+		return "", fmt.Errorf("token not found in context")
+	}
+
+	_, err := auth.ValidateToken(ctx, tokenFromCtx.(string))
+	if err != nil {
+		return "", fmt.Errorf("invalid token: %w", err)
+	}
+
+	return tokenFromCtx.(string), nil
+}
+
+func GetAuthorizationFromContext(ctx context.Context) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", fmt.Errorf("context error: %w", err)
+	}
+
+	authFromCtx := ctx.Value("Authorization")
+	if authFromCtx == nil {
+		return "", fmt.Errorf("authorization not found in context")
+	}
+
+	auth, ok := authFromCtx.(string)
+	if !ok {
+		return "", fmt.Errorf("authorization in context is not a string")
+	}
+
+	if auth == "" {
+		return "", fmt.Errorf("authorization in context is empty")
+	}
+
+	return auth, nil
+}
+
+func GetUserIDFromContext(ctx context.Context) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", fmt.Errorf("context error: %w", err)
+	}
+
+	userIDFromCtx := ctx.Value("UserID")
+	if userIDFromCtx == nil {
+		return "", fmt.Errorf("userID not found in context")
+	}
+
+	userID, ok := userIDFromCtx.(string)
+	if !ok {
+		return "", fmt.Errorf("userID in context is not a string")
+	}
+
+	if userID == "" {
+		return "", fmt.Errorf("userID in context is empty")
+	}
+
+	return userID, nil
 }

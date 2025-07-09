@@ -36,7 +36,7 @@ func GetRequiredHeaders(authClient authenticator.Authenticator, r *http.Request)
 }
 
 func validAuth(authClient authenticator.Authenticator, userID, authToken string) (string, error) {
-	claims, err := authClient.ValidateToken(context.TODO(), userID, authToken)
+	claims, err := authClient.ValidateToken(context.TODO(), authToken)
 	if err != nil {
 		return "", err
 	}

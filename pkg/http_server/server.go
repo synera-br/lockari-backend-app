@@ -71,6 +71,7 @@ func (s *RestAPI) MiddlewareHeader(c *gin.Context) {
 
 	c.Next()
 }
+
 func (s *RestAPI) CorsMiddleware() gin.HandlerFunc {
 	return cors.New(cors.Config{
 		AllowAllOrigins:  true,
