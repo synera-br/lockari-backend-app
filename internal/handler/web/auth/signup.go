@@ -59,13 +59,15 @@ func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...
 	withoutAuth := routerGroup.Group("/auth/signup")
 	withoutAuth.POST("/api/v1/audit/auth", h.WithJWT)
 	withoutAuth.POST("/audit/auth", h.WithJWT)
+	withoutAuth.GET("/api/v1/audit/auth", h.WithJWT)
+	withoutAuth.GET("/audit/auth", h.WithJWT)
 
-	extra := routerGroup.Group("/")
-	for _, mw := range middleware {
-		extra.Use(mw)
-	}
-	extra.GET("/api/v1/audit/auth", h.Extras)
-	extra.GET("/audit/auth", h.Extras)
+	// extra := routerGroup.Group("/")
+	// for _, mw := range middleware {
+	// 	extra.Use(mw)
+	// }
+	// extra.GET("/api/v1/audit/auth", h.Extras)
+	// extra.GET("/audit/auth", h.Extras)
 
 }
 
