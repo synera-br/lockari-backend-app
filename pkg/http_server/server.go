@@ -68,18 +68,18 @@ func (s *RestAPI) MiddlewareHeader(c *gin.Context) {
 	app := c.GetHeader("X-App")
 
 	if authorization == "" && token == "" {
-		c.Errors = append(c.Errors, &gin.Error{
-			Err: fmt.Errorf("missing X-Authorization header"),
-		})
+		// c.Errors = append(c.Errors, &gin.Error{
+		// 	Err: fmt.Errorf("missing X-Authorization header"),
+		// })
 		c.AbortWithStatus(401)
 		return
 	}
 
 	if app == "" {
-		c.Errors = append(c.Errors, &gin.Error{
-			Err:  fmt.Errorf("missing X-App header"),
-			Type: gin.ErrorTypePublic,
-		})
+		// c.Errors = append(c.Errors, &gin.Error{
+		// 	Err:  fmt.Errorf("missing X-App header"),
+		// 	Type: gin.ErrorTypePublic,
+		// })
 		c.AbortWithStatus(401)
 		return
 	}
