@@ -56,7 +56,7 @@ func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...
 	signupRoutes.GET("", h.List)
 	signupRoutes.GET("/:id", h.Get)
 
-	withoutAuth := routerGroup.Group("/auth/signup")
+	withoutAuth := routerGroup.Group("/")
 	withoutAuth.POST("/api/v1/audit/auth", h.WithJWT)
 	withoutAuth.POST("/audit/auth", h.WithJWT)
 	withoutAuth.GET("/api/v1/audit/auth", h.WithJWT)
