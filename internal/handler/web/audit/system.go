@@ -59,10 +59,7 @@ func InicializeAuditSystemEventHandler(svc entity.AuditSystemEventService, encry
 func (h *auditSystemEventHandler) setupRoutes(routerGroup *gin.RouterGroup, middlewares ...gin.HandlerFunc) {
 
 	auditRoutes := routerGroup.Group("/api/v1/audit")
-	middlewares = append(middlewares, middleware.ValidateToken(&gin.Context{}, h.authClient))
-	for _, mw := range middlewares {
-		auditRoutes.Use(mw)
-	}
+	auditRoutes.Use(middleware.ValidateTokenJWT(h.token))
 
 	auditRoutes.POST("/auth", h.Create)
 	auditRoutes.GET("/auth", h.List)
