@@ -59,7 +59,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	signup, err := initializeSignup(db)
+	signup, err := initializeSignup(db, authClient)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -183,14 +183,14 @@ func initializeAuth(db database.FirebaseDBInterface) (entity.LoginEventService, 
 	return svc, nil
 }
 
-func initializeSignup(db database.FirebaseDBInterface) (entity_auth.SignupEventService, error) {
+func initializeSignup(db database.FirebaseDBInterface, auth authenticator.Authenticator) (entity_auth.SignupEventService, error) {
 
 	repo, err := repo_auth.InitializeSignupEventRepository(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize signup event repository: %w", err)
 	}
 
-	svc, err := svc_auth.InitializeSignupEventService(repo)
+	svc, err := svc_auth.InitializeSignupEventService(repo, auth)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize signup event service: %w", err)
 	}
