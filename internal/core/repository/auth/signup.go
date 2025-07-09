@@ -8,7 +8,6 @@ import (
 	entity "github.com/synera-br/lockari-backend-app/internal/core/entity/auth"
 	core "github.com/synera-br/lockari-backend-app/internal/core/repository"
 	"github.com/synera-br/lockari-backend-app/pkg/database"
-	"github.com/synera-br/lockari-backend-app/pkg/utils"
 )
 
 type SignupEvent struct {
@@ -31,28 +30,23 @@ func InitializeSignupEventRepository(db database.FirebaseDBInterface) (entity.Si
 }
 
 func (r *SignupEvent) Create(ctx context.Context, signup map[string]interface{}) (entity.SignupEvent, error) {
-	_, err := utils.GetUserID(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	if len(signup) == 0 {
 		return nil, errors.New("invalid signup: no data provided")
 	}
 
-	collection, err := core.SetCollection(ctx, "signup")
-	if err != nil {
-		return nil, err
+	if ctx.Err() != nil {
+		return nil, errors.New("context cancelled")
 	}
-	// Save the signup event to the database
-	response, err := r.db.Create(ctx, signup, *collection)
+
+	// Save the signup event to the database na coleção correta
+	response, err := r.db.Create(ctx, signup, "tenants")
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to save signup event to database: " + err.Error())
 	}
 
 	newSignup, err := r.convertToEntity(response)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to convert response to signup entity: " + err.Error())
 	}
 
 	return newSignup, nil
@@ -73,7 +67,7 @@ func (r *SignupEvent) List(ctx context.Context, filter database.Conditional) ([]
 		return nil, errors.New("invalid filters: no value provided")
 	}
 
-	collection, err := core.SetCollection(ctx, "signup")
+	collection, err := core.SetCollection(ctx, "tenants")
 	if err != nil {
 		return nil, err
 	}
