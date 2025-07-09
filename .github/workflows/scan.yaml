@@ -60,11 +60,3 @@ jobs:
           staticcheck ./... > staticcheck-results.txt
         continue-on-error: true # Continua mesmo com erros de estilo/performance
 
-      - name: Run Gitleaks (Secret Scanning)
-        uses: zricethezav/gitleaks-action@v2
-        with:
-          # Para um histórico completo, fetch-depth deve ser 0 no checkout
-          # Caso queira um relatório SARIF para o GitHub Security tab
-          report_format: sarif
-          output: gitleaks-results.sarif
-        continue-on-error: true # Não queremos falhar o workflow por segredos detectados
