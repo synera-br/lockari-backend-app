@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -60,32 +61,32 @@ func setHeader(c *gin.Context) {
 
 func (s *RestAPI) MiddlewareHeader(c *gin.Context) {
 
-	// log.Println("MiddlewareHeader called")
-	// log.Println("Request Headers:", c.Request.Header)
-	// authorization := c.GetHeader("X-AUTHORIZATION")
-	// token := c.GetHeader("X-Token")
-	// app := c.GetHeader("X-App")
+	log.Println("MiddlewareHeader called")
+	log.Println("Request Headers:", c.Request.Header)
+	authorization := c.GetHeader("X-AUTHORIZATION")
+	token := c.GetHeader("X-Token")
+	app := c.GetHeader("X-App")
 
-	// if authorization == "" && token == "" {
-	// 	// c.Errors = append(c.Errors, &gin.Error{
-	// 	// 	Err: fmt.Errorf("missing X-Authorization header"),
-	// 	// })
-	// 	c.AbortWithStatus(401)
-	// 	return
-	// }
+	if authorization == "" && token == "" {
+		// c.Errors = append(c.Errors, &gin.Error{
+		// 	Err: fmt.Errorf("missing X-Authorization header"),
+		// })
+		c.AbortWithStatus(401)
+		return
+	}
 
-	// if app == "" {
-	// 	// c.Errors = append(c.Errors, &gin.Error{
-	// 	// 	Err:  fmt.Errorf("missing X-App header"),
-	// 	// 	Type: gin.ErrorTypePublic,
-	// 	// })
-	// 	c.AbortWithStatus(401)
-	// 	return
-	// }
+	if app == "" {
+		// c.Errors = append(c.Errors, &gin.Error{
+		// 	Err:  fmt.Errorf("missing X-App header"),
+		// 	Type: gin.ErrorTypePublic,
+		// })
+		c.AbortWithStatus(401)
+		return
+	}
 
-	// log.Println("Authorization Header:", authorization)
-	// log.Println("Token Header:", token)
-	// log.Println("App Header:", app)
+	log.Println("Authorization Header:", authorization)
+	log.Println("Token Header:", token)
+	log.Println("App Header:", app)
 	c.Next()
 }
 
