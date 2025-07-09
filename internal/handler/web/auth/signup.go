@@ -112,6 +112,7 @@ func (h *signupHandler) Extras(c *gin.Context) {
 func (h *signupHandler) WithJWT(c *gin.Context) {
 	log.Println("Handling signup with JWT...")
 
+	log.Println("Request Headers:", c.Request.Header)
 	// Exemplo de geração de token normal
 	claims := tokengen.TokenClaims{
 		AppID: "lockari-frontend-app",
