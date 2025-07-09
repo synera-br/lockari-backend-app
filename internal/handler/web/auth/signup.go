@@ -20,6 +20,7 @@ type SignupHandlerInterface interface {
 	Create(c *gin.Context)
 	Get(c *gin.Context)
 	List(c *gin.Context)
+	Extras(c *gin.Context)
 }
 
 func InitializeSignupHandler(
@@ -47,20 +48,20 @@ func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...
 		signupRoutes.Use(mw)
 	}
 
-	signupRoutes = routerGroup.Group("/auth/signup")
-
-	for _, mw := range middleware {
-		signupRoutes.Use(mw)
-	}
-
-	signupRoutes.GET("/api/v1/audit/auth", Extras)
-	signupRoutes.GET("/audit/auth", Extras)
-	signupRoutes.POST("/api/v1/audit/auth", Extras)
-	signupRoutes.POST("/audit/auth", Extras)
-
 	signupRoutes.POST("", h.Create)
 	signupRoutes.GET("", h.List)
 	signupRoutes.GET("/:id", h.Get)
+
+	extra := routerGroup.Group("/auth/signup")
+
+	for _, mw := range middleware {
+		extra.Use(mw)
+	}
+	extra.GET("/api/v1/audit/auth", h.Extras)
+	extra.GET("/audit/auth", h.Extras)
+	extra.POST("/api/v1/audit/auth", h.Extras)
+	extra.POST("/audit/auth", h.Extras)
+
 }
 
 func (h *signupHandler) Create(c *gin.Context) {
@@ -77,7 +78,7 @@ func (h *signupHandler) List(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "Signup events listed successfully"})
 }
 
-func Extras(c *gin.Context) {
+func (h *signupHandler) Extras(c *gin.Context) {
 	log.Println("Handling extras for signup...")
 	log.Println(c.Request.Header)
 	c.JSON(200, gin.H{"message": "Extras handled successfully"})
