@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/synera-br/lockari-backend-app/pkg/authenticator"
+	"github.com/synera-br/lockari-backend-app/pkg/tokengen"
 )
 
 type ContextKey string
@@ -68,6 +69,32 @@ func ValidateToken(ctx context.Context, auth authenticator.Authenticator) gin.Ha
 		c.Set(string(ClaimsContextKey), claims) // Optional: store all claims if needed elsewhere
 
 		// 6. Continue to the next handler in the chain.
+		c.Next()
+	}
+}
+
+func ValidateTokenJWT(token tokengen.TokenGenerator) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get the JWT from the Token header
+		authHeader := c.GetHeader("X-Token")
+		if authHeader == "" {
+			log.Println("X-Token header is missing")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization token not provided"})
+			return
+		}
+
+		// Validate the token
+		claims, err := token.Validate(authHeader)
+		if err != nil {
+			log.Printf("Token validation failed: %v", err)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			return
+		}
+
+		// Store the claims in the context
+		c.Set(string(ClaimsContextKey), claims)
+
+		// Continue to the next handler
 		c.Next()
 	}
 }
