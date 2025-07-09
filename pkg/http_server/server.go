@@ -60,11 +60,10 @@ func setHeader(c *gin.Context) {
 
 func (s *RestAPI) MiddlewareHeader(c *gin.Context) {
 
-	if c.GetHeader("X-USERID") == "" {
-		c.AbortWithStatus(401)
-		return
-	}
-	if c.GetHeader("X-AUTHORIZATION") == "" {
+	authorization := c.GetHeader("X-AUTHORIZATION")
+	token := c.GetHeader("X-TOKEN")
+
+	if authorization == "" && token == "" {
 		c.AbortWithStatus(401)
 		return
 	}
