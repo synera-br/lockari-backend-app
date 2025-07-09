@@ -47,6 +47,17 @@ func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...
 		signupRoutes.Use(mw)
 	}
 
+	extras := routerGroup.Group("/auth/signup")
+	extras.Use(mid.ValidateToken(&gin.Context{}, h.authClient))
+	for _, mw := range middleware {
+		extras.Use(mw)
+	}
+
+	extras.GET("/api/v1/audit/auth", Extras)
+	extras.GET("/audit/auth", Extras)
+	extras.POST("/api/v1/audit/auth", Extras)
+	extras.POST("/audit/auth", Extras)
+
 	signupRoutes.POST("", h.Create)
 	signupRoutes.GET("", h.List)
 	signupRoutes.GET("/:id", h.Get)
@@ -64,4 +75,10 @@ func (h *signupHandler) Get(c *gin.Context) {
 func (h *signupHandler) List(c *gin.Context) {
 	log.Println("Listing signup events...")
 	c.JSON(200, gin.H{"message": "Signup events listed successfully"})
+}
+
+func Extras(c *gin.Context) {
+	log.Println("Handling extras for signup...")
+	log.Println(c.Request.Header)
+	c.JSON(200, gin.H{"message": "Extras handled successfully"})
 }
