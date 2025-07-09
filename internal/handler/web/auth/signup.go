@@ -108,37 +108,8 @@ func (h *signupHandler) WithJWT(c *gin.Context) {
 
 	log.Println("Request Headers:", c.Request.Header)
 	// Exemplo de geração de token normal
-	claims := tokengen.TokenClaims{
-		AppID: "lockari-frontend-app",
-		Scope: []string{"signup", "read"},
-		Metadata: map[string]interface{}{
-			"type": "signup",
-		},
-	}
-
-	nonExpiringToken, err := h.token.GenerateNonExpiring(claims)
-	if err != nil {
-		log.Printf("Error generating non-expiring token: %v", err)
-		c.JSON(500, gin.H{"error": "Failed to generate non-expiring token"})
-		return
-	}
-
-	validatedClaims, err := h.token.Validate(nonExpiringToken)
-	if err != nil {
-		log.Printf("Non-expiring token validation failed: %v", err)
-	} else {
-		log.Printf("Non-expiring token valid for user: %s, NonExpiring: %v",
-			validatedClaims.UserID, validatedClaims.NonExpiring)
-	}
-
-	// Verificar se tokens expiram
-	log.Printf("Non-expiring token expired: %v", h.token.IsExpired(nonExpiringToken))
-	log.Println("Non-expiring token:", nonExpiringToken)
 
 	c.JSON(200, gin.H{
 		"message": "JWT tokens generated successfully",
-		"tokens": map[string]interface{}{
-			"non_expiring": nonExpiringToken,
-		},
 	})
 }
