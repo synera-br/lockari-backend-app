@@ -1,21 +1,21 @@
 package database
 
 const (
-	errorNotInitialized            = "database connection is not initialized"
-	errorNotConnected              = "database connection is not connected: %s"
-	errorToCloseConnection         = "error closing database connection: %s"
-	errorInvalidConfig             = "invalid database configuration"
-	errorInvalidType               = "invalid type for database configuration"
+	errorNotInitialized             = "database connection is not initialized"
+	errorNotConnected               = "database connection is not connected: %s"
+	errorToCloseConnection          = "error closing database connection: %s"
+	errorInvalidConfig              = "invalid database configuration"
+	errorInvalidType                = "invalid type for database configuration"
 	errorAuthorizationTokenRequired = "authorization token is required"
-	errorProviderNotFound          = "database provider not found"
-	errorProjectIDRequired         = "project ID is required for Firebase configuration"
-	errorClientNotInitialized      = "firestore client not initialized, please call Connect first"
-	errorGenericError              = "an error occurred: %s"
-	errorConditionalRequired       = "conditional is required for this operation"
-	errorConditionalFieldRequired  = "invalid conditional: field cannot be empty and value cannot be nil"
-	errorConditionalValueRequired  = "invalid conditional: value cannot be nil"
-	errorConditionalFilterRequired = "invalid conditional: operator cannot be empty"
-	errorCollectionRequired        = "collection is required for this operation"
+	errorProviderNotFound           = "database provider not found"
+	errorProjectIDRequired          = "project ID is required for Firebase configuration"
+	errorClientNotInitialized       = "firestore client not initialized, please call Connect first"
+	errorGenericError               = "an error occurred: %s"
+	errorConditionalRequired        = "conditional is required for this operation"
+	errorConditionalFieldRequired   = "invalid conditional: field cannot be empty and value cannot be nil"
+	errorConditionalValueRequired   = "invalid conditional: value cannot be nil"
+	errorConditionalFilterRequired  = "invalid conditional: operator cannot be empty"
+	errorCollectionRequired         = "collection is required for this operation"
 )
 
 // FirebaseConfig holds the configuration for Firebase connection

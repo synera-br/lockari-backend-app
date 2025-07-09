@@ -1,0 +1,72 @@
+package repository
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+
+	entity "github.com/synera-br/lockari-backend-app/internal/core/entity/audit"
+	"github.com/synera-br/lockari-backend-app/pkg/database"
+	"github.com/synera-br/lockari-backend-app/pkg/utils"
+)
+
+type auditSystemEvent struct {
+	db database.FirebaseDBInterface
+}
+
+func InicializeAuditSystemEventRepository(db database.FirebaseDBInterface) (entity.AuditSystemEventRepository, error) {
+	if db == nil {
+		return nil, errors.New("database is required")
+	}
+
+	return &auditSystemEvent{
+		db: db,
+	}, nil
+}
+
+func (r *auditSystemEvent) Create(ctx context.Context, audit map[string]interface{}) (*entity.AuditSystemEvent, error) {
+
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
+	}
+
+	if len(audit) == 0 {
+		return nil, errors.New("invalid audit: no data provided")
+	}
+
+	response, err := r.db.Create(ctx, audit, collectionAuditSystem)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create audit: %w", err)
+	}
+
+	auditResponse, err := r.convertToEntity(response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert audit response: %w", err)
+	}
+
+	return auditResponse, nil
+}
+
+func (r *auditSystemEvent) Get(ctx context.Context, filters database.Conditional) (*entity.AuditSystemEvent, error) {
+	return nil, nil
+}
+
+func (r *auditSystemEvent) List(ctx context.Context, filters database.Conditional) ([]entity.AuditSystemEvent, error) {
+	return nil, nil
+}
+
+func (r *auditSystemEvent) convertToEntity(data []byte) (*entity.AuditSystemEvent, error) {
+
+	if len(data) == 0 {
+		return nil, errors.New("error to convert audit data to map")
+	}
+
+	var audit *entity.AuditSystemEvent
+	err := json.Unmarshal(data, audit)
+	if err != nil {
+		return nil, errors.New("failed to unmarshal signup data")
+	}
+
+	return audit, nil
+}
