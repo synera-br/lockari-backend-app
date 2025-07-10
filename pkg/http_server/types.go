@@ -52,13 +52,10 @@ func NewRestApi(fields RestAPIConfig) (*RestAPI, error) {
 
 	r, g := newRestAPI(rest)
 
-	g.Group(fmt.Sprintf("/%s/%s", rest.Name, rest.Version))
-	r.Group(fmt.Sprintf("/%s/%s", rest.Name, rest.Version))
-
 	return &RestAPI{
 		Config:      rest,
 		Routes:      r,
-		RouterGroup: g,
+		RouterGroup: g.Group(fmt.Sprintf("/%s/%s", rest.Name, rest.Version)),
 	}, nil
 }
 
