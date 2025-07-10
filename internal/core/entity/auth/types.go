@@ -35,54 +35,54 @@ const (
 
 // IsValid
 // This method validates the User struct to ensure that required fields are present.
-func (u *User) IsValid() (err error) {
+func (u *User) IsValid() error {
 
 	if u == nil {
-		err = errors.New("invalid user: user event cannot be nil")
-		return err
+		return errors.New("invalid user: user event cannot be nil")
 	}
 
 	if u.Uid == "" {
-		err = errors.New("invalid user: uid is required")
-		return err
+		return errors.New("invalid user: uid is required")
 	}
+
 	if u.Email == "" {
-		err = errors.New("invalid user: email is required")
-		return err
+		return errors.New("invalid user: email is required")
 	}
-	return err
+
+	if u.Plan == "" {
+		return errors.New("invalid user: plan is required")
+	}
+
+	return nil
 }
 
 // IsValid
 // This method validates the Client struct to ensure that required fields are present.
-func (c *Client) IsValid() (err error) {
+func (c *Client) IsValid() error {
 
 	if c == nil {
-		err = errors.New("invalid client: client event cannot be nil")
-		return err
+		return errors.New("invalid client: client event cannot be nil")
 	}
 
 	if c.IpAddress == "" {
-		err = errors.New("invalid client: ipAddress is required")
-		return err
+		return errors.New("invalid client: ipAddress is required")
 	}
+
 	if c.UserAgent == "" {
-		err = errors.New("invalid client: userAgent is required")
-		return err
+		return errors.New("invalid client: userAgent is required")
 	}
-	return err
+	return nil
 }
 
 // IsValid
 // This method validates the EventType to ensure that it is one of the predefined event types.
-func (e *EventType) IsValid() (err error) {
+func (e *EventType) IsValid() error {
 	switch *e {
 	case LOGIN_SUCCESS, SIGNUP_SUCCESS, LOGIN_FAILURE, LOGOUT, PASSWORD_RESET_REQUEST, PASSWORD_CHANGE_SUCCESS:
 		return nil
 	default:
-		err = errors.New("invalid event type")
+		return errors.New("invalid event type")
 	}
-	return err
 }
 
 // GetEventType

@@ -117,9 +117,11 @@ func (s *Signup) IsValid() (err error) {
 	if err = s.ClientInfo.IsValid(); err != nil {
 		return err
 	}
+
 	if s.EventType == "" {
 		err = errors.New("invalid signup: eventType is required")
 	}
+	
 	if s.Timestamp.IsZero() {
 		err = errors.New("invalid signup: timestamp is required")
 	}

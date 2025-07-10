@@ -40,7 +40,7 @@ func (s *SignupEvent) Create(ctx context.Context, signupData *entity.Signup) (en
 	}
 
 	if err := signupData.IsValid(); err != nil {
-		return nil, core.ErrGenericError("Invalid signup event")
+		return nil, fmt.Errorf("Invalid signup event: %w", err)
 	}
 
 	// CHECK CONTEXT
