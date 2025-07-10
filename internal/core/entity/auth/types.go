@@ -2,6 +2,7 @@ package entity
 
 import (
 	"errors"
+	"fmt"
 )
 
 // User
@@ -41,6 +42,8 @@ func (u *User) IsValid() error {
 		return errors.New("invalid user: user event cannot be nil")
 	}
 
+	fmt.Println("Validating User:", u)
+	fmt.Printf("User ID: %s, Email: %s, Name: %s, Plan: %s\n", u.Uid, u.Email, u.Name, u.Plan)
 	if u.Uid == "" {
 		return errors.New("invalid user: uid is required")
 	}
