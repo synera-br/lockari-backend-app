@@ -3,6 +3,7 @@ package webhandler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -92,6 +93,9 @@ func (h *signupHandler) Create(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "Invalid signup event data"})
 		return
 	}
+
+	fmt.Println("Received Signup Event:", string(decryptedData))
+	fmt.Println("Validating Signup Event:", signup)
 
 	ctx := context.WithValue(c.Request.Context(), "token", token)
 	_, err = h.svc.Create(ctx, &signup)
