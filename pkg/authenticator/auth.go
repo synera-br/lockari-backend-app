@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	firebase "firebase.google.com/go/v4"
@@ -64,21 +65,47 @@ func InitializeAuth(ctx context.Context, config *FirebaseConfig) (Authenticator,
 		return nil, errors.New("firebase config cannot be nil")
 	}
 
+	log.Printf("Initializing Firebase Auth with ServiceAccountKeyPath: %s", config.ServiceAccountKeyPath)
+	log.Printf("Project ID: %s", config.ProjectID)
+
 	var app *firebase.App
 	var err error
 
 	// Option 1: Using service account key file
-	if config.APIKey != "" {
-		opt := option.WithAPIKey(config.APIKey)
+	if config.ServiceAccountKeyPath != "" {
+		log.Printf("Using service account key file: %s", config.ServiceAccountKeyPath)
+
+		// Check if file exists
+		if _, err := os.Stat(config.ServiceAccountKeyPath); err != nil {
+			return nil, fmt.Errorf("service account key file not found or not accessible: %w", err)
+		}
+
+		opt := option.WithCredentialsFile(config.ServiceAccountKeyPath)
 		conf := &firebase.Config{
-			ProjectID:     config.ProjectID,
-			StorageBucket: config.StorageBucket,
+			ProjectID: config.ProjectID,
 		}
 		if config.DatabaseURL != "" {
 			conf.DatabaseURL = config.DatabaseURL
 		}
+		if config.StorageBucket != "" {
+			conf.StorageBucket = config.StorageBucket
+		}
+
+		log.Printf("Creating Firebase app with config: %+v", conf)
 		app, err = firebase.NewApp(ctx, conf, opt)
+
+		if err != nil {
+			log.Printf("Failed to create Firebase app with service account file, trying environment variable...")
+			// Fallback: try using environment variable
+			// Set the environment variable and try again
+			if envErr := os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", config.ServiceAccountKeyPath); envErr != nil {
+				log.Printf("Failed to set GOOGLE_APPLICATION_CREDENTIALS: %v", envErr)
+			} else {
+				app, err = firebase.NewApp(ctx, conf)
+			}
+		}
 	} else {
+		log.Printf("Using default credentials (ADC)")
 		// Option 2: Using default credentials (ADC - Application Default Credentials)
 		// This works when running on Google Cloud or with GOOGLE_APPLICATION_CREDENTIALS env var
 		conf := &firebase.Config{}
@@ -207,14 +234,17 @@ func (fa *firebaseAuthenticator) SetTenantId(ctx context.Context, uid string, te
 		return errors.New("tenantId cannot be empty")
 	}
 
+	log.Printf("Setting tenant ID for user %s: %s", uid, tenantId)
+
 	// Set custom user claims with tenantId
 	claims := map[string]interface{}{
 		"tenantId": tenantId,
 	}
 
+	log.Printf("Calling SetCustomUserClaims with claims: %+v", claims)
 	err := fa.client.SetCustomUserClaims(ctx, uid, claims)
 	if err != nil {
-		log.Printf("Error setting custom user claims: %v", err)
+		log.Printf("Error setting custom user claims for user %s: %v", uid, err)
 		return fmt.Errorf("error setting custom user claims: %w", err)
 	}
 
