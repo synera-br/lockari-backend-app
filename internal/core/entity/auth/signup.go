@@ -118,10 +118,6 @@ func (s *Signup) IsValid() (err error) {
 		return err
 	}
 
-	if s.EventType == "" {
-		err = errors.New("invalid signup: eventType is required")
-	}
-
 	if s.Timestamp.IsZero() {
 		err = errors.New("invalid signup: timestamp is required")
 	}
