@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 )
 
 type CryptData struct {
@@ -51,10 +52,22 @@ func (c *CryptData) validateTokenFromString(token *string) error {
 // Retorna os dados descriptografados como um slice de bytes ou um erro em caso de falha.
 // Se o token for inválido ou a descriptografia falhar, retorna um erro.
 func (c *CryptData) PayloadData(base64Payload string) ([]byte, error) {
+	log.Println("Decrypting payload with global key...")
+	if c.encryptKey == nil || *c.encryptKey == "" {
+		return nil, errors.New("decrypt: package key (encryptKey) is empty") //
+	}
+	log.Println("Using package key for decryption:", *c.encryptKey)
 	decryptedData, err := c.DecryptPayload(base64Payload, *c.encryptKey)
 	if err != nil {
 		return nil, fmt.Errorf("decryption failed: %w", err) // Usar %w para wrapping de erro
 	}
+
+	if len(decryptedData) == 0 {
+		return nil, errors.New("decryption resulted in empty data (possible wrong key or corrupted data)")
+	}
+	log.Println("Decryption successful, returning data...")
+	log.Println("Decrypted data size:", len(decryptedData))
+
 	return decryptedData, nil // Retornar nil para o erro em caso de sucesso
 }
 
@@ -79,6 +92,7 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 	if base64Payload == "" {
 		return nil, errors.New("decrypt: base64 payload is empty")
 	}
+
 	if base64KeyInput == "" {
 		return nil, errors.New("decrypt: base64 key is empty")
 	}
@@ -87,6 +101,7 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 	if err != nil {
 		return nil, fmt.Errorf("decrypt: failed to decode base64 key: %w", err)
 	}
+	log.Println("Decoded key bytes:", keyBytes, "length:", len(keyBytes), "bytes:", string(keyBytes))
 
 	switch len(keyBytes) {
 	case 16, 24, 32:
@@ -99,6 +114,8 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 		return nil, fmt.Errorf("decrypt: failed to decode base64 payload: %w", err)
 	}
 
+	log.Println("Decoded combined bytes length:", len(combinedBytes), "bytes:", combinedBytes)
+
 	if len(combinedBytes) < aes.BlockSize {
 		return nil, fmt.Errorf("decrypt: combined payload too short to contain IV (got %d bytes, expected at least %d)", len(combinedBytes), aes.BlockSize)
 	}
@@ -109,6 +126,7 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 	if len(ciphertext) == 0 {
 		return nil, errors.New("decrypt: ciphertext is empty after IV extraction")
 	}
+
 	if len(ciphertext)%aes.BlockSize != 0 {
 		return nil, fmt.Errorf("decrypt: ciphertext length (%d) is not a multiple of AES block size (%d)", len(ciphertext), aes.BlockSize)
 	}
