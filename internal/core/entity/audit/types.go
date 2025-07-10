@@ -2,7 +2,6 @@ package entity
 
 import (
 	"errors"
-	"log"
 )
 
 // EventType
@@ -84,12 +83,7 @@ func (c *Client) IsValid() (err error) {
 
 func (f *FailureReason) IsValid() (err error) {
 
-	if f == nil {
-		log.Println("Validating FailureReason: nil")
-	} else {
-		log.Println("Validating FailureReason:", f, "with value:", *f)
-	}
-	if f != nil {
+	if f != nil && *f != "" {
 		if *f != INVALID_CREDENTIAL && *f != USER_NOT_FOUND && *f != ACCOUNT_LOCKED {
 			err = errors.New("invalid failure reason: failure reason must be one of the predefined values")
 		}
