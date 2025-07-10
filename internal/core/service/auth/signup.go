@@ -9,15 +9,17 @@ import (
 	core "github.com/synera-br/lockari-backend-app/internal/core/entity/types"
 	"github.com/synera-br/lockari-backend-app/pkg/authenticator"
 	"github.com/synera-br/lockari-backend-app/pkg/database"
+	"github.com/synera-br/lockari-backend-app/pkg/tokengen"
 	"github.com/synera-br/lockari-backend-app/pkg/utils"
 )
 
 type SignupEvent struct {
-	repo entity.SignupEventRepository
-	auth authenticator.Authenticator
+	repo     entity.SignupEventRepository
+	auth     authenticator.Authenticator
+	tokenJWT tokengen.TokenGenerator
 }
 
-func InitializeSignupEventService(repo entity.SignupEventRepository, auth authenticator.Authenticator) (entity.SignupEventService, error) {
+func InitializeSignupEventService(repo entity.SignupEventRepository, auth authenticator.Authenticator, tokenJWT tokengen.TokenGenerator) (entity.SignupEventService, error) {
 
 	if repo == nil {
 		return nil, core.ErrRepositoryNotFound("SignupEventRepository")
@@ -27,9 +29,14 @@ func InitializeSignupEventService(repo entity.SignupEventRepository, auth authen
 		return nil, core.ErrRepositoryNotFound("Authenticator")
 	}
 
+	if tokenJWT == nil {
+		return nil, core.ErrRepositoryNotFound("TokenGenerator")
+	}
+
 	return &SignupEvent{
-		repo: repo,
-		auth: auth,
+		repo:     repo,
+		auth:     auth,
+		tokenJWT: tokenJWT,
 	}, nil
 }
 
@@ -52,15 +59,11 @@ func (s *SignupEvent) Create(ctx context.Context, signupData *entity.Signup) (en
 
 	// CHECK TOKEN
 	fmt.Println("[SERVICE] 3 Checking token")
-	token := utils.GetTokenFromContext(ctx, s.auth) // Ensure user ID is retrieved from context
+	token := utils.GetTokenFromContext(ctx) // Ensure user ID is retrieved from context
 
-	userFromToken, err := s.auth.GetUserID(ctx, token)
+	_, err := s.tokenJWT.Validate(token)
 	if err != nil {
 		return nil, fmt.Errorf(utils.GenericError, err.Error())
-	}
-
-	if userFromToken != signupData.User.Uid {
-		return nil, core.ErrUnauthorized("User ID does not match signup event user ID")
 	}
 
 	// CHECK IF USER ALREADY HAS A TENANT
@@ -95,11 +98,11 @@ func (s *SignupEvent) Create(ctx context.Context, signupData *entity.Signup) (en
 	}
 
 	// Log da geração do tenant para auditoria
-	log.Printf("Generated tenant %s for user %s", tenantId, userFromToken)
+	log.Printf("Generated tenant %s ", tenantId)
 
 	// SET TENANT ID AT FIREBASE AUTHENTICATION
 	fmt.Println("[SERVICE] 9 Setting tenant ID in authentication service")
-	err = s.auth.SetTenantId(ctx, userFromToken, tenantId)
+	err = s.auth.SetTenantId(ctx, signupData.User.Uid, tenantId)
 	if err != nil {
 		return nil, core.ErrGenericError("Failed to set tenant ID")
 	}
@@ -119,9 +122,9 @@ func (s *SignupEvent) Create(ctx context.Context, signupData *entity.Signup) (en
 		originalErr := err
 
 		// Tentar rollback do tenant
-		if rollbackErr := s.auth.SetTenantRollback(ctx, userFromToken, ""); rollbackErr != nil {
+		if rollbackErr := s.auth.SetTenantRollback(ctx, signupData.User.Uid, ""); rollbackErr != nil {
 			// Log o erro de rollback, mas retorna o erro original
-			log.Printf("Failed to rollback tenant for user %s: %v", userFromToken, rollbackErr)
+			log.Printf("Failed to rollback tenant for user %s: %v", signupData.User.Uid, rollbackErr)
 		}
 
 		// Sempre retorna o erro original, não o erro do rollback
@@ -129,7 +132,7 @@ func (s *SignupEvent) Create(ctx context.Context, signupData *entity.Signup) (en
 	}
 
 	// Log de sucesso para auditoria
-	log.Printf("Successfully created signup event for user %s with tenant %s", userFromToken, tenantId)
+	log.Printf("Successfully created signup event for user %s with tenant %s", signupData.User.Uid, tenantId)
 
 	return result, nil
 }
@@ -144,7 +147,7 @@ func (s *SignupEvent) Get(ctx context.Context, id string) (entity.SignupEvent, e
 		return nil, core.ErrGenericError("Signup event ID is required")
 	}
 
-	token := utils.GetTokenFromContext(ctx, s.auth)
+	token := utils.GetTokenFromContext(ctx)
 
 	userFromToken, err := s.auth.GetUserID(ctx, token)
 	if err != nil {
@@ -181,7 +184,7 @@ func (s *SignupEvent) List(ctx context.Context) ([]entity.SignupEvent, error) {
 		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
 	}
 
-	token := utils.GetTokenFromContext(ctx, s.auth)
+	token := utils.GetTokenFromContext(ctx)
 
 	userFromToken, err := s.auth.GetUserID(ctx, token)
 	if err != nil {

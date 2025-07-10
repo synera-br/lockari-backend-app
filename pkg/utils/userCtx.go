@@ -57,10 +57,11 @@ func ValidateTokenFromContext(ctx context.Context, auth authenticator.Authentica
 	return tokenFromCtx.(string), nil
 }
 
-func GetTokenFromContext(ctx context.Context, auth authenticator.Authenticator) string {
+func GetTokenFromContext(ctx context.Context) string {
 	if err := ctx.Err(); err != nil {
 		return ""
 	}
+
 	tokenFromCtx := ctx.Value("token")
 	if tokenFromCtx == nil {
 		return ""

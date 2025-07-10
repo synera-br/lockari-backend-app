@@ -43,7 +43,7 @@ func (s *auditSystemEvent) Create(ctx context.Context, event *entity.AuditSystem
 		return nil, errors.New(utils.ContextCancelled)
 	}
 
-	token := utils.GetTokenFromContext(ctx, s.auth) // Ensure user ID is retrieved from context
+	token := utils.GetTokenFromContext(ctx) // Ensure user ID is retrieved from context
 	_, err := s.tokenJWT.Validate(token)
 	if err != nil {
 		return nil, err
