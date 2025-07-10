@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -60,8 +59,7 @@ func setHeader(c *gin.Context) {
 }
 
 func (s *RestAPI) MiddlewareHeader(c *gin.Context) {
-	log.Println("MiddlewareHeader called")
-	log.Println("Request Headers:", c.Request.Header)
+
 	authorization := c.GetHeader("X-AUTHORIZATION")
 	token := c.GetHeader("X-TOKEN")
 	app := c.GetHeader("X-APP")

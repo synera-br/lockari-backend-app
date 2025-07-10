@@ -67,12 +67,7 @@ func (api *RestAPIConfig) Validate() error {
 	if api.Host == "" {
 		api.Host = "0.0.0.0"
 	}
-	if api.Name == "" {
-		api.Name = "api"
-	}
-	if api.Version == "" {
-		api.Version = "v1"
-	}
+
 	if api.Mode == "" {
 		api.Mode = "debug"
 	}
@@ -84,6 +79,8 @@ func (api *RestAPIConfig) Validate() error {
 			return fmt.Errorf("certificate_key is required")
 		}
 	}
+
+	fmt.Printf("\nStarting the path for the API: /%s/%s", api.Name, api.Version)
 
 	return nil
 }
