@@ -65,7 +65,7 @@ func main() {
 	}
 	defer mq.Close()
 
-	token, err := initializeJWT(cfg.Fields["token"].(map[string]interface{}))
+	tokenJWT, err := initializeJWT(cfg.Fields["token"].(map[string]interface{}))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -80,14 +80,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	auditSvc, err := initializeAuditEvent(db, authClient)
+	auditSvc, err := initializeAuditEvent(db, authClient, tokenJWT)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	webhandler.InitializeLoginHandler(authSvc, crypt, authClient, token, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
-	webhandler.InitializeSignupHandler(signup, crypt, authClient, token, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
-	webhandler_audit.InicializeAuditSystemEventHandler(auditSvc, crypt, authClient, token, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
+	webhandler.InitializeLoginHandler(authSvc, crypt, authClient, tokenJWT, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
+	webhandler.InitializeSignupHandler(signup, crypt, authClient, tokenJWT, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
+	webhandler_audit.InitializeAuditSystemEventHandler(auditSvc, crypt, authClient, tokenJWT, apiResponse.RouterGroup, apiResponse.MiddlewareHeader)
 
 	log.Println(cacheClient, signup)
 	log.Println("Starting Lockari Backend App...")
@@ -236,13 +236,13 @@ func initializeSignup(db database.FirebaseDBInterface, auth authenticator.Authen
 	return svc, nil
 }
 
-func initializeAuditEvent(db database.FirebaseDBInterface, auth authenticator.Authenticator) (entity_audit.AuditSystemEventService, error) {
+func initializeAuditEvent(db database.FirebaseDBInterface, auth authenticator.Authenticator, tokenJWT tokengen.TokenGenerator) (entity_audit.AuditSystemEventService, error) {
 	repo, err := repo_audit.InicializeAuditSystemEventRepository(db)
 	if err != nil {
 		return nil, err
 	}
 
-	svc, err := svc_audit.InitializeAuditSystemEventService(repo, auth)
+	svc, err := svc_audit.InitializeAuditSystemEventService(repo, auth, tokenJWT)
 	if err != nil {
 		return nil, err
 	}

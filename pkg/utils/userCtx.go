@@ -40,7 +40,7 @@ func GetUserID(ctx context.Context) (*string, error) {
 	return &userID, nil
 }
 
-func GetTokenFromContext(ctx context.Context, auth authenticator.Authenticator) (string, error) {
+func ValidateTokenFromContext(ctx context.Context, auth authenticator.Authenticator) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", fmt.Errorf(ContextError, err.Error())
 	}
@@ -55,6 +55,18 @@ func GetTokenFromContext(ctx context.Context, auth authenticator.Authenticator) 
 	}
 
 	return tokenFromCtx.(string), nil
+}
+
+func GetTokenFromContext(ctx context.Context, auth authenticator.Authenticator) string {
+	if err := ctx.Err(); err != nil {
+		return ""
+	}
+	tokenFromCtx := ctx.Value("token")
+	if tokenFromCtx == nil {
+		return ""
+	}
+
+	return tokenFromCtx.(string)
 }
 
 func GetAuthorizationFromContext(ctx context.Context) (string, error) {

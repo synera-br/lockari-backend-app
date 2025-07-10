@@ -42,10 +42,7 @@ func (s *SignupEvent) Create(ctx context.Context, signup entity.SignupEvent) (en
 		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
 	}
 
-	token, err := utils.GetTokenFromContext(ctx, s.auth) // Ensure user ID is retrieved from context
-	if err != nil {
-		return nil, err
-	}
+	token := utils.GetTokenFromContext(ctx, s.auth) // Ensure user ID is retrieved from context
 
 	user := signup.GetUser()
 	userFromToken, err := s.auth.GetUserID(ctx, token)
@@ -115,10 +112,7 @@ func (s *SignupEvent) Get(ctx context.Context, id string) (entity.SignupEvent, e
 		return nil, core.ErrGenericError("Signup event ID is required")
 	}
 
-	token, err := utils.GetTokenFromContext(ctx, s.auth)
-	if err != nil {
-		return nil, err
-	}
+	token := utils.GetTokenFromContext(ctx, s.auth)
 
 	userFromToken, err := s.auth.GetUserID(ctx, token)
 	if err != nil {
@@ -150,10 +144,7 @@ func (s *SignupEvent) List(ctx context.Context) ([]entity.SignupEvent, error) {
 		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
 	}
 
-	token, err := utils.GetTokenFromContext(ctx, s.auth)
-	if err != nil {
-		return nil, err
-	}
+	token := utils.GetTokenFromContext(ctx, s.auth)
 
 	userFromToken, err := s.auth.GetUserID(ctx, token)
 	if err != nil {

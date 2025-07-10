@@ -6,15 +6,17 @@ import (
 
 	entity "github.com/synera-br/lockari-backend-app/internal/core/entity/audit"
 	"github.com/synera-br/lockari-backend-app/pkg/authenticator"
+	"github.com/synera-br/lockari-backend-app/pkg/tokengen"
 	"github.com/synera-br/lockari-backend-app/pkg/utils"
 )
 
 type auditSystemEvent struct {
-	repo entity.AuditSystemEventRepository
-	auth authenticator.Authenticator
+	repo     entity.AuditSystemEventRepository
+	auth     authenticator.Authenticator
+	tokenJWT tokengen.TokenGenerator
 }
 
-func InitializeAuditSystemEventService(repo entity.AuditSystemEventRepository, auth authenticator.Authenticator) (entity.AuditSystemEventService, error) {
+func InitializeAuditSystemEventService(repo entity.AuditSystemEventRepository, auth authenticator.Authenticator, tokenJWT tokengen.TokenGenerator) (entity.AuditSystemEventService, error) {
 	if repo == nil {
 		return nil, errors.New(utils.RepositoryNotFound + "AuditSystemEventRepository")
 	}
@@ -23,9 +25,14 @@ func InitializeAuditSystemEventService(repo entity.AuditSystemEventRepository, a
 		return nil, errors.New(utils.RepositoryNotFound + "Authenticator")
 	}
 
+	if tokenJWT == nil {
+		return nil, errors.New(utils.RepositoryNotFound + "TokenGenerator")
+	}
+
 	return &auditSystemEvent{
-		repo: repo,
-		auth: auth,
+		repo:     repo,
+		auth:     auth,
+		tokenJWT: tokenJWT,
 	}, nil
 }
 
@@ -35,13 +42,11 @@ func (s *auditSystemEvent) Create(ctx context.Context, event *entity.AuditSystem
 	if ctx.Err() != nil {
 		return nil, errors.New(utils.ContextCancelled)
 	}
-	token, err := utils.GetTokenFromContext(ctx, s.auth) // Ensure user ID is retrieved from context
+
+	token := utils.GetTokenFromContext(ctx, s.auth) // Ensure user ID is retrieved from context
+	_, err := s.tokenJWT.Validate(token)
 	if err != nil {
 		return nil, err
-	}
-
-	if token == "" {
-		return nil, errors.New(utils.InvalidToken)
 	}
 
 	// AUDIT

@@ -29,7 +29,7 @@ type auditSystemEventHandlerInterface interface {
 	List(c *gin.Context)
 }
 
-func InicializeAuditSystemEventHandler(svc entity.AuditSystemEventService, encryptor cryptserver.CryptDataInterface, authClient authenticator.Authenticator, token tokengen.TokenGenerator, routerGroup *gin.RouterGroup, middlewares ...gin.HandlerFunc) (auditSystemEventHandlerInterface, error) {
+func InitializeAuditSystemEventHandler(svc entity.AuditSystemEventService, encryptor cryptserver.CryptDataInterface, authClient authenticator.Authenticator, token tokengen.TokenGenerator, routerGroup *gin.RouterGroup, middlewares ...gin.HandlerFunc) (auditSystemEventHandlerInterface, error) {
 
 	if svc == nil {
 		return nil, fmt.Errorf(utils.ServiceNotFoundError, "audit system event service")
