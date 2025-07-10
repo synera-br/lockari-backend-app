@@ -29,7 +29,7 @@ func InitializeSignupEventRepository(db database.FirebaseDBInterface) (entity.Si
 	}, nil
 }
 
-func (r *SignupEvent) Create(ctx context.Context, signup map[string]interface{}) (entity.SignupEvent, error) {
+func (r *SignupEvent) Create(ctx context.Context, signup map[string]interface{}) (*entity.Signup, error) {
 	if len(signup) == 0 {
 		return nil, errors.New("invalid signup: no data provided")
 	}
@@ -52,13 +52,13 @@ func (r *SignupEvent) Create(ctx context.Context, signup map[string]interface{})
 	return newSignup, nil
 }
 
-func (r *SignupEvent) Get(ctx context.Context, filters database.Conditional) (entity.SignupEvent, error) {
-	var signup entity.SignupEvent
+func (r *SignupEvent) Get(ctx context.Context, filters database.Conditional) (*entity.Signup, error) {
+	var signup entity.Signup
 
-	return signup, nil
+	return &signup, nil
 }
 
-func (r *SignupEvent) List(ctx context.Context, filter database.Conditional) ([]entity.SignupEvent, error) {
+func (r *SignupEvent) List(ctx context.Context, filter database.Conditional) ([]entity.Signup, error) {
 
 	if filter.Field == "" {
 		return nil, errors.New("invalid filters: no field provided")
@@ -89,28 +89,28 @@ func (r *SignupEvent) List(ctx context.Context, filter database.Conditional) ([]
 	return items, nil
 }
 
-func (r *SignupEvent) convertToEntity(data []byte) (entity.SignupEvent, error) {
+func (r *SignupEvent) convertToEntity(data []byte) (*entity.Signup, error) {
 
 	if len(data) == 0 {
 		return nil, errors.New("error to convert signup data to map")
 	}
 
-	var signup entity.SignupEvent
+	var signup entity.Signup
 	err := json.Unmarshal(data, &signup)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal signup data")
 	}
 
-	return signup, nil
+	return &signup, nil
 }
 
-func (r *SignupEvent) convertToEntities(data []byte) ([]entity.SignupEvent, error) {
+func (r *SignupEvent) convertToEntities(data []byte) ([]entity.Signup, error) {
 
 	if len(data) == 0 {
 		return nil, errors.New("error to convert signup data to map")
 	}
 
-	var signups []entity.SignupEvent
+	var signups []entity.Signup
 	err := json.Unmarshal(data, &signups)
 	if err != nil {
 		return nil, errors.New("failed to unmarshal signup data")

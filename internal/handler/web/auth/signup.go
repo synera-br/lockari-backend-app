@@ -93,10 +93,8 @@ func (h *signupHandler) Create(c *gin.Context) {
 		return
 	}
 
-	signupEvent, err := entity.NewSignup()
-
 	ctx := context.WithValue(c.Request.Context(), "token", token)
-	_, err = h.svc.Create(ctx, signup)
+	_, err = h.svc.Create(ctx, &signup)
 	if err != nil {
 		log.Println("Error creating signup event:", err)
 		c.JSON(500, gin.H{"error": "Failed to create signup event"})

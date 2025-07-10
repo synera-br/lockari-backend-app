@@ -153,7 +153,12 @@ func (s *SignupEvent) Get(ctx context.Context, id string) (entity.SignupEvent, e
 		return nil, core.ErrUnauthorized("User is not authorized to access this signup event")
 	}
 
-	return result, nil
+	SignupEvent := entity.NewSignup(result.GetUser(), result.GetClientInfo(), result.GetTenant())
+	if err := SignupEvent.IsValid(); err != nil {
+		return nil, err
+	}
+
+	return SignupEvent, nil
 }
 
 func (s *SignupEvent) List(ctx context.Context) ([]entity.SignupEvent, error) {
@@ -174,5 +179,24 @@ func (s *SignupEvent) List(ctx context.Context) ([]entity.SignupEvent, error) {
 		Filter: database.FilterEquals,
 	}
 
-	return s.repo.List(ctx, filter)
+	result, err := s.repo.List(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result) == 0 {
+		return nil, core.ErrNotFound("No signup events found for user")
+	}
+
+	var signupEvents []entity.SignupEvent
+	for _, signup := range result {
+		if err := signup.IsValid(); err != nil {
+			return nil, err
+		}
+
+		e := entity.NewSignup(signup.GetUser(), signup.GetClientInfo(), signup.GetTenant())
+		signupEvents = append(signupEvents, e)
+	}
+
+	return signupEvents, nil
 }
