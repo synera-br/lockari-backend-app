@@ -40,7 +40,7 @@ type SignupEvent interface {
 type Signup struct {
 	ID         string    `json:"id,omitempty"` // Optional: Unique identifier for the signup event
 	EventType  EventType `json:"eventType"`
-	User       `json:"user" binding:"required"`
+	User       
 	ClientInfo Client    `json:"clientInfo" binding:"required"`
 	Timestamp  time.Time `json:"timestamp" binding:"required"`
 	Tenant     string    `json:"tenant,omitempty"` // Optional: Tenant information if applicable
