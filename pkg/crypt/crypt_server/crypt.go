@@ -6,32 +6,29 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64" // Usado para codificar/decodificar a chave e o payload.
-
-	// "encoding/hex" // Não é mais necessário com a correção em EncryptPayload.
-	// "encoding/json" // Não é mais necessário pois EncryptPayload agora recebe []byte.
 	"errors"
 	"fmt"
 	"io"
 )
 
 type CryptData struct {
-	Payload string `json:"payload" binding:"required"`
-	token   *string
+	Payload    string `json:"payload" binding:"required"`
+	encryptKey *string
 }
 
-func InicializationCryptData(token *string) (CryptDataInterface, error) {
+func InicializationCryptData(encryptKey *string) (CryptDataInterface, error) {
 
-	if token == nil || *token == "" {
+	if encryptKey == nil || *encryptKey == "" {
 		return nil, errors.New("token is nil")
 	}
 
 	data := &CryptData{}
-	err := data.validateTokenFromString(token)
+	err := data.validateTokenFromString(encryptKey)
 	if err != nil {
 		return nil, err
 	}
 
-	data.token = token
+	data.encryptKey = encryptKey
 
 	return data, nil
 }
@@ -50,8 +47,11 @@ func (c *CryptData) validateTokenFromString(token *string) error {
 }
 
 // PayloadData é uma função wrapper que descriptografa usando a chave global do pacote.
+// Ela espera que o payload seja uma string Base64 no formato: Base64(bytes_crus_IV + bytes_crus_Ciphertext).
+// Retorna os dados descriptografados como um slice de bytes ou um erro em caso de falha.
+// Se o token for inválido ou a descriptografia falhar, retorna um erro.
 func (c *CryptData) PayloadData(base64Payload string) ([]byte, error) {
-	decryptedData, err := c.DecryptPayload(base64Payload, *c.token)
+	decryptedData, err := c.DecryptPayload(base64Payload, *c.encryptKey)
 	if err != nil {
 		return nil, fmt.Errorf("decryption failed: %w", err) // Usar %w para wrapping de erro
 	}
@@ -69,13 +69,6 @@ func (c *CryptData) pkcs7Unpad(data []byte, blockSize int) ([]byte, error) {
 	if paddingLen == 0 || paddingLen > blockSize || paddingLen > len(data) {
 		return nil, errors.New("pkcs7Unpad: invalid padding length (possible wrong key or corrupted data)")
 	}
-
-	// Opcional: Validar se todos os bytes de padding são iguais a paddingLen
-	// for i := 0; i < paddingLen; i++ {
-	//    if data[len(data)-1-i] != byte(paddingLen) {
-	//        return nil, errors.New("pkcs7Unpad: invalid padding bytes")
-	//    }
-	// }
 
 	return data[:len(data)-paddingLen], nil
 }
@@ -150,12 +143,12 @@ func (c *CryptData) pkcs7Pad(data []byte, blockSize int) ([]byte, error) {
 // usando AES-CBC. O output é uma string Base64 no formato: Base64(bytes_crus_IV + bytes_crus_Ciphertext).
 // Utiliza a chave global 'base64Key' definida no pacote.
 func (c *CryptData) EncryptPayload(jsonDataBytes []byte) (string, error) {
-	if *c.token == "" { // Verifica a constante global
+	if *c.encryptKey == "" { // Verifica a constante global
 		return "", errors.New("encrypt: package key (base64Key) is empty")
 	}
 
 	// 1. Decodificar a chave de Base64 para bytes (usando a constante do pacote)
-	keyBytes, err := base64.StdEncoding.DecodeString(*c.token)
+	keyBytes, err := base64.StdEncoding.DecodeString(*c.encryptKey)
 	if err != nil {
 		// Este erro seria inesperado se a constante base64Key for válida
 		return "", fmt.Errorf("encrypt: failed to decode package base64 key: %w", err)

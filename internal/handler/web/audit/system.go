@@ -90,7 +90,8 @@ func (h *auditSystemEventHandler) Create(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "Invalid request payload"})
 		return
 	}
-
+	log.Println("Received body:", body)
+	log.Println("Size of Payload:", len(body.Payload))
 	decryptedData, err := h.encryptor.PayloadData(body.Payload)
 	if err != nil {
 		log.Println("Error decrypting payload:", err)
