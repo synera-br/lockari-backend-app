@@ -1,6 +1,9 @@
 package entity
 
-import "errors"
+import (
+	"errors"
+	"log"
+)
 
 // EventType
 // This struct defines the type of event that is being logged, such as login or signup.
@@ -81,6 +84,11 @@ func (c *Client) IsValid() (err error) {
 
 func (f *FailureReason) IsValid() (err error) {
 
+	if f == nil {
+		log.Println("Validating FailureReason: nil")
+	} else {
+		log.Println("Validating FailureReason:", f, "with value:", *f)
+	}
 	if f != nil {
 		if *f != INVALID_CREDENTIAL && *f != USER_NOT_FOUND && *f != ACCOUNT_LOCKED {
 			err = errors.New("invalid failure reason: failure reason must be one of the predefined values")
