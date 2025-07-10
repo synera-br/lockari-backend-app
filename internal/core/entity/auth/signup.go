@@ -38,9 +38,9 @@ type SignupEvent interface {
 // Signup
 // This event is triggered when a user successfully signs up for the application.
 type Signup struct {
-	ID         string    `json:"id,omitempty"` // Optional: Unique identifier for the signup event
-	EventType  EventType `json:"eventType"`
-	User       
+	ID        string    `json:"id,omitempty"`        // Optional: Unique identifier for the signup event
+	EventType EventType `json:"eventType,omitempty"` // Event type, e.g., SIGNUP_SUCCESS
+	User
 	ClientInfo Client    `json:"clientInfo" binding:"required"`
 	Timestamp  time.Time `json:"timestamp" binding:"required"`
 	Tenant     string    `json:"tenant,omitempty"` // Optional: Tenant information if applicable
