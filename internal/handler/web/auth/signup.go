@@ -94,10 +94,8 @@ func (h *signupHandler) Create(c *gin.Context) {
 		return
 	}
 
-	fmt.Println("Received Signup Event:", string(decryptedData))
-	fmt.Println("Validating Signup Event:", signup)
-
 	ctx := context.WithValue(c.Request.Context(), "token", token)
+	fmt.Println("Handler start - creating signup event with context:", signup)
 	_, err = h.svc.Create(ctx, &signup)
 	if err != nil {
 		log.Println("Error creating signup event:", err)
