@@ -124,7 +124,6 @@ func newRestAPI(config *RestAPIConfig) (*gin.Engine, *gin.RouterGroup) {
 	router.SetTrustedProxies([]string{"127.0.0.1", "192.168.1.2", "10.0.0.0/8"})
 
 	routerGroupPath := fmt.Sprintf("/%s", config.Name)
-	routerPath = router.Group(routerGroupPath)
 
 	router.GET("/metrics", prometheusHandler())
 
