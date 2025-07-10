@@ -24,8 +24,14 @@ func InicializationCryptData(encryptKey *string) (CryptDataInterface, error) {
 		return nil, errors.New("token is nil")
 	}
 
+	// Log da chave original para debug
+	log.Printf("DEBUG: Original encrypt key: %q (length: %d)", *encryptKey, len(*encryptKey))
+
 	// Limpar espaços em branco e quebras de linha (como no frontend)
 	newEncryptKey := strings.TrimSpace(strings.ReplaceAll(*encryptKey, "\n", ""))
+
+	// Log da chave após limpeza
+	log.Printf("DEBUG: Cleaned encrypt key: %q (length: %d)", newEncryptKey, len(newEncryptKey))
 
 	// Validar se a chave após limpeza não ficou vazia
 	if newEncryptKey == "" {
@@ -40,6 +46,9 @@ func InicializationCryptData(encryptKey *string) (CryptDataInterface, error) {
 
 	// CRÍTICO: Armazenar a chave LIMPA, não a original
 	data.encryptKey = &newEncryptKey
+
+	// Log da chave final armazenada
+	log.Printf("DEBUG: Final stored encrypt key: %q", *data.encryptKey)
 
 	return data, nil
 }
@@ -177,11 +186,17 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 		return nil, errors.New("decrypt: key contains invalid Base64 characters")
 	}
 
+	// Log detalhado da chave para debug
+	log.Printf("DEBUG: Raw base64 key input: %q (length: %d)", base64KeyInput, len(base64KeyInput))
+
 	keyBytes, err := base64.StdEncoding.DecodeString(base64KeyInput)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt: failed to decode base64 key: %w", err)
 	}
-	log.Println("Decoded key bytes:", keyBytes, "length:", len(keyBytes), "bytes:", string(keyBytes))
+
+	log.Printf("DEBUG: Decoded key bytes: %v (length: %d)", keyBytes, len(keyBytes))
+	log.Printf("DEBUG: Key as string: %q", string(keyBytes))
+	log.Printf("DEBUG: Key hex: %x", keyBytes)
 
 	// Validação rigorosa do tamanho da chave (mesma do frontend)
 	switch len(keyBytes) {
@@ -195,7 +210,8 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 		return nil, fmt.Errorf("decrypt: failed to decode base64 payload: %w", err)
 	}
 
-	log.Println("Decoded combined bytes length:", len(combinedBytes), "bytes:", combinedBytes)
+	log.Printf("DEBUG: Combined bytes length: %d", len(combinedBytes))
+	log.Printf("DEBUG: First 32 bytes (IV): %x", combinedBytes[:min(32, len(combinedBytes))])
 
 	// Validação do tamanho mínimo (deve ter pelo menos o IV)
 	if len(combinedBytes) < aes.BlockSize {
@@ -204,6 +220,9 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 
 	iv := combinedBytes[:aes.BlockSize]
 	ciphertext := combinedBytes[aes.BlockSize:]
+
+	log.Printf("DEBUG: IV: %x", iv)
+	log.Printf("DEBUG: Ciphertext length: %d", len(ciphertext))
 
 	// Validar se o ciphertext não está vazio
 	if len(ciphertext) == 0 {
@@ -223,6 +242,9 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(ciphertext, ciphertext) // Descriptografa in-place
 
+	log.Printf("DEBUG: Decrypted ciphertext (before unpadding): %x", ciphertext)
+	log.Printf("DEBUG: Last 16 bytes of decrypted data: %x", ciphertext[len(ciphertext)-16:])
+
 	unpaddedData, err := c.pkcs7Unpad(ciphertext, aes.BlockSize)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt: failed to unpad data: %w", err)
@@ -233,7 +255,18 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 		return nil, errors.New("decrypt: unpaddedData is empty (possible wrong key or corrupted data)")
 	}
 
+	log.Printf("DEBUG: Final unpaddedData length: %d", len(unpaddedData))
+	log.Printf("DEBUG: Final unpaddedData as string: %s", string(unpaddedData))
+
 	return unpaddedData, nil
+}
+
+// Helper function para Go < 1.21
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // pkcs7Pad adiciona padding PKCS7 aos dados.
