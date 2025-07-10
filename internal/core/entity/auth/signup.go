@@ -40,7 +40,7 @@ type SignupEvent interface {
 type Signup struct {
 	ID         string    `json:"id,omitempty"` // Optional: Unique identifier for the signup event
 	EventType  EventType `json:"eventType"`
-	User       User      `json:"user" binding:"required"`
+	User       `json:"user" binding:"required"`
 	ClientInfo Client    `json:"clientInfo" binding:"required"`
 	Timestamp  time.Time `json:"timestamp" binding:"required"`
 	Tenant     string    `json:"tenant,omitempty"` // Optional: Tenant information if applicable
@@ -121,7 +121,7 @@ func (s *Signup) IsValid() (err error) {
 	if s.EventType == "" {
 		err = errors.New("invalid signup: eventType is required")
 	}
-	
+
 	if s.Timestamp.IsZero() {
 		err = errors.New("invalid signup: timestamp is required")
 	}
