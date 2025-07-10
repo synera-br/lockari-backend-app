@@ -26,12 +26,17 @@ func InicializationCryptData(encryptKey *string) (CryptDataInterface, error) {
 
 	// Log da chave original para debug
 	log.Printf("DEBUG: Original encrypt key: %q (length: %d)", *encryptKey, len(*encryptKey))
+	log.Printf("DEBUG: Original encrypt key hex: %x", []byte(*encryptKey))
 
-	// Limpar espaços em branco e quebras de linha (como no frontend)
-	newEncryptKey := strings.TrimSpace(strings.ReplaceAll(*encryptKey, "\n", ""))
+	// Limpeza AGRESSIVA: remover TODOS os espaços em branco, quebras de linha, \r, \t, etc.
+	newEncryptKey := strings.ReplaceAll(*encryptKey, "\n", "")
+	newEncryptKey = strings.ReplaceAll(newEncryptKey, "\r", "")
+	newEncryptKey = strings.ReplaceAll(newEncryptKey, "\t", "")
+	newEncryptKey = strings.TrimSpace(newEncryptKey)
 
 	// Log da chave após limpeza
 	log.Printf("DEBUG: Cleaned encrypt key: %q (length: %d)", newEncryptKey, len(newEncryptKey))
+	log.Printf("DEBUG: Cleaned encrypt key hex: %x", []byte(newEncryptKey))
 
 	// Validar se a chave após limpeza não ficou vazia
 	if newEncryptKey == "" {
@@ -195,7 +200,7 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 	}
 
 	log.Printf("DEBUG: Decoded key bytes: %v (length: %d)", keyBytes, len(keyBytes))
-	log.Printf("DEBUG: Key as string: %q", string(keyBytes))
+	log.Printf("DEBUG: Key as string: %s", string(keyBytes))
 	log.Printf("DEBUG: Key hex: %x", keyBytes)
 
 	// Validação rigorosa do tamanho da chave (mesma do frontend)
