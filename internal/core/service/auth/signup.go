@@ -48,11 +48,12 @@ func (s *SignupEvent) Create(ctx context.Context, signupData *entity.Signup) (en
 		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
 	}
 
+	// CHECK TOKEN
 	token := utils.GetTokenFromContext(ctx, s.auth) // Ensure user ID is retrieved from context
 
 	userFromToken, err := s.auth.GetUserID(ctx, token)
 	if err != nil {
-		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
+		return nil, fmt.Errorf(utils.GenericError, err.Error())
 	}
 
 	if userFromToken != signupData.User.Uid {

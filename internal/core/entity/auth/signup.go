@@ -82,7 +82,7 @@ func (s *Signup) GetSignup() Signup {
 }
 
 func (s *Signup) SetTenant(tenant *string) error {
-	if tenant == nil || *tenant == "" {
+	if tenant == nil {
 		return errors.New("invalid signup: tenant cannot be empty")
 	}
 
@@ -92,6 +92,10 @@ func (s *Signup) SetTenant(tenant *string) error {
 
 	if s.Tenant == *tenant {
 		return nil
+	}
+
+	if s.Tenant != "" {
+		return errors.New("invalid signup: tenant is already set")
 	}
 
 	s.Tenant = *tenant
