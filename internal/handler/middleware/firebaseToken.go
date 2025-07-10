@@ -76,9 +76,9 @@ func ValidateToken(ctx context.Context, auth authenticator.Authenticator) gin.Ha
 func ValidateTokenJWT(token tokengen.TokenGenerator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the JWT from the Token header
-		authHeader := c.GetHeader("X-Token")
+		authHeader := c.GetHeader("X-TOKEN")
 		if authHeader == "" {
-			log.Println("X-Token header is missing")
+			log.Println("X-TOKEN header is missing")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization token not provided"})
 			return
 		}

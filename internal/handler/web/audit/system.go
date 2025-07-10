@@ -74,7 +74,7 @@ func (h *auditSystemEventHandler) Create(c *gin.Context) {
 
 	log.Println("Handling audit event creation...")
 
-	token := c.GetHeader("X-Token")
+	token := c.GetHeader("X-TOKEN")
 	h.token.Validate(token)
 
 	_, err := h.token.Validate(token)
