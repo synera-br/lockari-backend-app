@@ -55,7 +55,7 @@ func NewRestApi(fields RestAPIConfig) (*RestAPI, error) {
 	return &RestAPI{
 		Config:      rest,
 		Routes:      r,
-		RouterGroup: g.Group(fmt.Sprintf("/%s/%s", rest.Name, rest.Version)),
+		RouterGroup: g.Group(fmt.Sprintf("/%s", rest.Version)),
 	}, nil
 }
 
@@ -124,6 +124,7 @@ func newRestAPI(config *RestAPIConfig) (*gin.Engine, *gin.RouterGroup) {
 	router.SetTrustedProxies([]string{"127.0.0.1", "192.168.1.2", "10.0.0.0/8"})
 
 	routerGroupPath := fmt.Sprintf("/%s", config.Name)
+	routerPath = router.Group(routerGroupPath)
 
 	router.GET("/metrics", prometheusHandler())
 
