@@ -32,7 +32,7 @@ func InicializationCryptData(encryptKey *string) (CryptDataInterface, error) {
 		return nil, err
 	}
 
-	data.encryptKey = encryptKey
+	data.encryptKey = &newEncryptKey
 
 	return data, nil
 }
