@@ -67,11 +67,11 @@ func (r *auditSystemEvent) convertToEntity(data []byte) (*entity.AuditSystemEven
 		return nil, errors.New("error to convert audit data to map")
 	}
 
-	var audit *entity.AuditSystemEvent
-	err := json.Unmarshal(data, audit)
+	var audit entity.AuditSystemEvent
+	err := json.Unmarshal(data, &audit)
 	if err != nil {
-		return nil, errors.New("failed to unmarshal signup data")
+		return nil, fmt.Errorf("failed to unmarshal audit data: %w", err)
 	}
 
-	return audit, nil
+	return &audit, nil
 }
