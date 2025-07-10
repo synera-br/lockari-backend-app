@@ -3,6 +3,7 @@ package entity
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/synera-br/lockari-backend-app/pkg/database"
 )
@@ -52,6 +53,10 @@ func (a *AuditSystemEvent) IsValid() error {
 
 	if a.Timestamp == "" {
 		return errors.New("invalid audit event: timestamp is required")
+	}
+
+	if a.CreatedAt == "" {
+		a.CreatedAt = time.Now().Format(time.RFC3339)
 	}
 
 	if err := a.FailureReason.IsValid(); err != nil {
