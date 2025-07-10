@@ -56,6 +56,16 @@ func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...
 	signupRoutes.GET("", h.List)
 	signupRoutes.GET("/:id", h.Get)
 
+	extra := routerGroup.Group("/api/v1/auth/signup")
+	middleware = append(middleware, mid.ValidateToken(&gin.Context{}, h.authClient))
+	for _, mw := range middleware {
+		extra.Use(mw)
+	}
+
+	extra.POST("", h.Create)
+	extra.GET("", h.List)
+	extra.GET("/:id", h.Get)
+
 }
 
 func (h *signupHandler) Create(c *gin.Context) {
