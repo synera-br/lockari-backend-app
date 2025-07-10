@@ -24,7 +24,13 @@ func InicializationCryptData(encryptKey *string) (CryptDataInterface, error) {
 		return nil, errors.New("token is nil")
 	}
 
-	newEncryptKey := strings.TrimSpace(*encryptKey)
+	// Limpar espaços em branco e quebras de linha (como no frontend)
+	newEncryptKey := strings.TrimSpace(strings.ReplaceAll(*encryptKey, "\n", ""))
+
+	// Validar se a chave após limpeza não ficou vazia
+	if newEncryptKey == "" {
+		return nil, errors.New("token is empty after trimming whitespace")
+	}
 
 	data := &CryptData{}
 	err := data.validateTokenFromString(&newEncryptKey)
@@ -32,22 +38,59 @@ func InicializationCryptData(encryptKey *string) (CryptDataInterface, error) {
 		return nil, err
 	}
 
+	// CRÍTICO: Armazenar a chave LIMPA, não a original
 	data.encryptKey = &newEncryptKey
 
 	return data, nil
 }
 
 func (c *CryptData) validateTokenFromString(token *string) error {
-	decodeToken, err := base64.StdEncoding.DecodeString(*token)
+	if token == nil || *token == "" {
+		return errors.New("token is nil or empty")
+	}
+
+	// Validar formato Base64 básico antes de tentar decodificar
+	tokenValue := *token
+	if len(tokenValue) == 0 {
+		return errors.New("token is empty")
+	}
+
+	// Validar caracteres Base64 válidos
+	if !isValidBase64(tokenValue) {
+		return errors.New("token contains invalid Base64 characters")
+	}
+
+	decodeToken, err := base64.StdEncoding.DecodeString(tokenValue)
 	if err != nil {
 		return fmt.Errorf("failed to decode base64 key: %w", err)
 	}
 
-	if decodeToken == nil || string(decodeToken) == "" {
-		return errors.New("token is nil")
+	if len(decodeToken) == 0 {
+		return errors.New("decoded token is empty")
 	}
 
-	return nil
+	// Validar tamanhos de chave AES suportados (mesma validação do frontend)
+	switch len(decodeToken) {
+	case 16, 24, 32:
+		// Tamanhos válidos para AES-128, AES-192, AES-256
+		return nil
+	default:
+		return fmt.Errorf("invalid AES key size: %d bytes (must be 16, 24, or 32)", len(decodeToken))
+	}
+}
+
+// isValidBase64 verifica se a string contém apenas caracteres Base64 válidos
+func isValidBase64(s string) bool {
+	// Regex para Base64 válido: A-Z, a-z, 0-9, +, /, e = no final
+	for _, char := range s {
+		if !((char >= 'A' && char <= 'Z') ||
+			(char >= 'a' && char <= 'z') ||
+			(char >= '0' && char <= '9') ||
+			char == '+' || char == '/' || char == '=') {
+			return false
+		}
+	}
+	return true
 }
 
 // PayloadData é uma função wrapper que descriptografa usando a chave global do pacote.
@@ -56,13 +99,24 @@ func (c *CryptData) validateTokenFromString(token *string) error {
 // Se o token for inválido ou a descriptografia falhar, retorna um erro.
 func (c *CryptData) PayloadData(base64Payload string) ([]byte, error) {
 	log.Println("Decrypting payload with global key...")
-	if c.encryptKey == nil || *c.encryptKey == "" {
-		return nil, errors.New("decrypt: package key (encryptKey) is empty") //
+
+	// Validações de entrada (consistentes com o frontend)
+	if base64Payload == "" {
+		return nil, errors.New("decrypt: base64 payload is empty")
 	}
+
+	if !isValidBase64(base64Payload) {
+		return nil, errors.New("decrypt: payload contains invalid Base64 characters")
+	}
+
+	if c.encryptKey == nil || *c.encryptKey == "" {
+		return nil, errors.New("decrypt: package key (encryptKey) is empty")
+	}
+
 	log.Println("Using package key for decryption:", *c.encryptKey)
 	decryptedData, err := c.DecryptPayload(base64Payload, *c.encryptKey)
 	if err != nil {
-		return nil, fmt.Errorf("decryption failed: %w", err) // Usar %w para wrapping de erro
+		return nil, fmt.Errorf("decryption failed: %w", err)
 	}
 
 	if len(decryptedData) == 0 {
@@ -71,7 +125,7 @@ func (c *CryptData) PayloadData(base64Payload string) ([]byte, error) {
 	log.Println("Decryption successful, returning data...")
 	log.Println("Decrypted data size:", len(decryptedData))
 
-	return decryptedData, nil // Retornar nil para o erro em caso de sucesso
+	return decryptedData, nil
 }
 
 // pkcs7Unpad remove o padding PKCS7 dos dados.
@@ -80,10 +134,22 @@ func (c *CryptData) pkcs7Unpad(data []byte, blockSize int) ([]byte, error) {
 		return nil, errors.New("pkcs7Unpad: input data is empty")
 	}
 
+	if blockSize <= 0 || blockSize > 255 {
+		return nil, fmt.Errorf("pkcs7Unpad: invalid block size %d", blockSize)
+	}
+
 	paddingLen := int(data[len(data)-1])
 
+	// Validações mais rigorosas do padding
 	if paddingLen == 0 || paddingLen > blockSize || paddingLen > len(data) {
 		return nil, errors.New("pkcs7Unpad: invalid padding length (possible wrong key or corrupted data)")
+	}
+
+	// Validar se todos os bytes de padding são iguais
+	for i := len(data) - paddingLen; i < len(data); i++ {
+		if data[i] != byte(paddingLen) {
+			return nil, errors.New("pkcs7Unpad: invalid padding bytes (possible wrong key or corrupted data)")
+		}
 	}
 
 	return data[:len(data)-paddingLen], nil
@@ -91,7 +157,8 @@ func (c *CryptData) pkcs7Unpad(data []byte, blockSize int) ([]byte, error) {
 
 // DecryptPayload descriptografa um payload que foi criptografado usando AES-CBC.
 // Espera-se que base64Payload seja Base64(bytes_crus_IV + bytes_crus_Ciphertext).
-func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) ([]byte, error) { // Renomeado parâmetro para evitar confusão com a constante
+func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) ([]byte, error) {
+	// Validações de entrada mais rigorosas
 	if base64Payload == "" {
 		return nil, errors.New("decrypt: base64 payload is empty")
 	}
@@ -100,12 +167,23 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 		return nil, errors.New("decrypt: base64 key is empty")
 	}
 
+	// Validar formato Base64 do payload
+	if !isValidBase64(base64Payload) {
+		return nil, errors.New("decrypt: payload contains invalid Base64 characters")
+	}
+
+	// Validar formato Base64 da chave
+	if !isValidBase64(base64KeyInput) {
+		return nil, errors.New("decrypt: key contains invalid Base64 characters")
+	}
+
 	keyBytes, err := base64.StdEncoding.DecodeString(base64KeyInput)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt: failed to decode base64 key: %w", err)
 	}
 	log.Println("Decoded key bytes:", keyBytes, "length:", len(keyBytes), "bytes:", string(keyBytes))
 
+	// Validação rigorosa do tamanho da chave (mesma do frontend)
 	switch len(keyBytes) {
 	case 16, 24, 32:
 	default:
@@ -119,6 +197,7 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 
 	log.Println("Decoded combined bytes length:", len(combinedBytes), "bytes:", combinedBytes)
 
+	// Validação do tamanho mínimo (deve ter pelo menos o IV)
 	if len(combinedBytes) < aes.BlockSize {
 		return nil, fmt.Errorf("decrypt: combined payload too short to contain IV (got %d bytes, expected at least %d)", len(combinedBytes), aes.BlockSize)
 	}
@@ -126,10 +205,12 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 	iv := combinedBytes[:aes.BlockSize]
 	ciphertext := combinedBytes[aes.BlockSize:]
 
+	// Validar se o ciphertext não está vazio
 	if len(ciphertext) == 0 {
 		return nil, errors.New("decrypt: ciphertext is empty after IV extraction")
 	}
 
+	// Validar se o ciphertext é múltiplo do block size
 	if len(ciphertext)%aes.BlockSize != 0 {
 		return nil, fmt.Errorf("decrypt: ciphertext length (%d) is not a multiple of AES block size (%d)", len(ciphertext), aes.BlockSize)
 	}
@@ -145,6 +226,11 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 	unpaddedData, err := c.pkcs7Unpad(ciphertext, aes.BlockSize)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt: failed to unpad data: %w", err)
+	}
+
+	// Validar se os dados descriptografados não estão vazios
+	if len(unpaddedData) == 0 {
+		return nil, errors.New("decrypt: unpaddedData is empty (possible wrong key or corrupted data)")
 	}
 
 	return unpaddedData, nil
@@ -164,8 +250,13 @@ func (c *CryptData) pkcs7Pad(data []byte, blockSize int) ([]byte, error) {
 // usando AES-CBC. O output é uma string Base64 no formato: Base64(bytes_crus_IV + bytes_crus_Ciphertext).
 // Utiliza a chave global 'base64Key' definida no pacote.
 func (c *CryptData) EncryptPayload(jsonDataBytes []byte) (string, error) {
-	if *c.encryptKey == "" { // Verifica a constante global
-		return "", errors.New("encrypt: package key (base64Key) is empty")
+	// Validações de entrada (consistentes com o frontend)
+	if len(jsonDataBytes) == 0 {
+		return "", errors.New("encrypt: jsonDataBytes is empty")
+	}
+
+	if c.encryptKey == nil || *c.encryptKey == "" {
+		return "", errors.New("encrypt: package key (encryptKey) is empty")
 	}
 
 	// 1. Decodificar a chave de Base64 para bytes (usando a constante do pacote)
@@ -175,7 +266,7 @@ func (c *CryptData) EncryptPayload(jsonDataBytes []byte) (string, error) {
 		return "", fmt.Errorf("encrypt: failed to decode package base64 key: %w", err)
 	}
 
-	// Validar o tamanho da chave
+	// Validar o tamanho da chave (mesmo que frontend)
 	switch len(keyBytes) {
 	case 16, 24, 32:
 	default:
@@ -217,6 +308,11 @@ func (c *CryptData) EncryptPayload(jsonDataBytes []byte) (string, error) {
 	// que é o que DecryptPayload espera e o que o frontend (CryptoJS) originalmente produzia.
 	base64EncryptedPayload := base64.StdEncoding.EncodeToString(combinedRawBytes)
 	// --- FIM DAS ALTERAÇÕES CRÍTICAS ---
+
+	// Validação final do resultado (como no frontend)
+	if base64EncryptedPayload == "" {
+		return "", errors.New("encrypt: failed to generate Base64 output")
+	}
 
 	return base64EncryptedPayload, nil
 }
