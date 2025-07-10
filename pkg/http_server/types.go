@@ -143,6 +143,8 @@ func newRestAPI(config *RestAPIConfig) (*gin.Engine, *gin.RouterGroup) {
 		c.Redirect(301, fmt.Sprintf("%s/docs/swagger/index.html", routerGroupPath))
 	})
 
+	router.Group(fmt.Sprintf("%s/%s", config.Name, config.Version))
+
 	router.Use(setHeader)
 
 	corsConfig := cors.DefaultConfig()
