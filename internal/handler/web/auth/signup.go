@@ -3,7 +3,6 @@ package webhandler
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -94,7 +93,6 @@ func (h *signupHandler) Create(c *gin.Context) {
 	}
 
 	ctx := context.WithValue(c.Request.Context(), "token", token)
-	fmt.Println("Handler start - creating signup event with context:", signup)
 	_, err = h.svc.Create(ctx, &signup)
 	if err != nil {
 		log.Println("Error creating signup event:", err)

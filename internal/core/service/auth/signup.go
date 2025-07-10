@@ -117,9 +117,6 @@ func (s *SignupEvent) Create(ctx context.Context, signupData *entity.Signup) (en
 		return nil, originalErr
 	}
 
-	// Log de sucesso para auditoria
-	log.Printf("Successfully created signup event for user %s with tenant %s", signupData.User.Uid, tenantId)
-
 	return result, nil
 }
 

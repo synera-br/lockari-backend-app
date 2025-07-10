@@ -73,7 +73,6 @@ func InitializeAuth(ctx context.Context, config *FirebaseConfig) (Authenticator,
 
 	// Option 1: Using service account key file
 	if config.ServiceAccountKeyPath != "" {
-		log.Printf("Using service account key file: %s", config.ServiceAccountKeyPath)
 
 		// Check if file exists
 		if _, err := os.Stat(config.ServiceAccountKeyPath); err != nil {
@@ -91,7 +90,6 @@ func InitializeAuth(ctx context.Context, config *FirebaseConfig) (Authenticator,
 			conf.StorageBucket = config.StorageBucket
 		}
 
-		log.Printf("Creating Firebase app with config: %+v", conf)
 		app, err = firebase.NewApp(ctx, conf, opt)
 
 		if err != nil {
@@ -234,21 +232,15 @@ func (fa *firebaseAuthenticator) SetTenantId(ctx context.Context, uid string, te
 		return errors.New("tenantId cannot be empty")
 	}
 
-	log.Printf("Setting tenant ID for user %s: %s", uid, tenantId)
-
 	// Set custom user claims with tenantId
 	claims := map[string]interface{}{
 		"tenantId": tenantId,
 	}
 
-	log.Printf("Calling SetCustomUserClaims with claims: %+v", claims)
 	err := fa.client.SetCustomUserClaims(ctx, uid, claims)
 	if err != nil {
-		log.Printf("Error setting custom user claims for user %s: %v", uid, err)
 		return fmt.Errorf("error setting custom user claims: %w", err)
 	}
-
-	log.Printf("Successfully set tenant ID for user %s: %s", uid, tenantId)
 
 	return nil
 }
@@ -272,8 +264,6 @@ func (fa *firebaseAuthenticator) SetTenantRollback(ctx context.Context, uid stri
 		log.Printf("Error setting custom user claims: %v", err)
 		return fmt.Errorf("error setting custom user claims: %w", err)
 	}
-
-	log.Printf("Successfully set tenant ID for user %s: %s", uid, tenantId)
 
 	return nil
 }
