@@ -80,8 +80,6 @@ func (api *RestAPIConfig) Validate() error {
 		}
 	}
 
-	fmt.Printf("\nStarting the path for the API: /%s/%s", api.Name, api.Version)
-
 	return nil
 }
 
@@ -142,9 +140,6 @@ func newRestAPI(config *RestAPIConfig) (*gin.Engine, *gin.RouterGroup) {
 	routerPath.GET("/", func(c *gin.Context) {
 		c.Redirect(301, fmt.Sprintf("%s/docs/swagger/index.html", routerGroupPath))
 	})
-
-	routerPath.Group(fmt.Sprintf("%s/%s", config.Name, config.Version))
-	router.Group(fmt.Sprintf("%s/%s", config.Name, config.Version))
 
 	router.Use(setHeader)
 
