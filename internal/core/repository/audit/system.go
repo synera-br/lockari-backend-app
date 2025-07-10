@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 
 	entity "github.com/synera-br/lockari-backend-app/internal/core/entity/audit"
 	"github.com/synera-br/lockari-backend-app/pkg/database"
@@ -39,6 +40,10 @@ func (r *auditSystemEvent) Create(ctx context.Context, audit map[string]interfac
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audit: %w", err)
 	}
+
+	log.Println("Audit created successfully:", response)
+	log.Println("Audit data:", audit)
+	log.Println("Audit response:", string(response))
 
 	auditResponse, err := r.convertToEntity(response)
 	if err != nil {
