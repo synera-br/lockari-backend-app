@@ -22,6 +22,7 @@ func main() {
 	// Definir flags de linha de comando
 	var (
 		mode        = flag.String("mode", "decrypt", "Modo de operação: 'encrypt' ou 'decrypt'")
+		cryptMode   = flag.String("crypt", "CBC", "Modo de criptografia: 'CBC' ou 'GCM'")
 		key         = flag.String("key", defaultTestKey, "Chave de criptografia em Base64")
 		payload     = flag.String("payload", "", "Payload para criptografar/descriptografar")
 		interactive = flag.Bool("i", false, "Modo interativo")
@@ -45,19 +46,36 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Inicializar CryptData
-	cryptData, err := cryptserver.InicializationCryptData(key)
+	// Validar modo de criptografia
+	if *cryptMode != "CBC" && *cryptMode != "GCM" {
+		fmt.Printf("Erro: modo de criptografia inválido: %s (deve ser CBC ou GCM)\n", *cryptMode)
+		showHelp()
+		os.Exit(1)
+	}
+
+	// Inicializar CryptData com modo específico
+	var cryptData cryptserver.CryptDataInterface
+	var err error
+
+	if *cryptMode == "CBC" {
+		cryptData, err = cryptserver.InicializationCryptData(key)
+	} else {
+		cryptData, err = cryptserver.InicializationCryptDataWithMode(key, *cryptMode)
+	}
+
 	if err != nil {
 		log.Fatalf("Erro ao inicializar CryptData: %v", err)
 	}
 
+	fmt.Printf("Modo de criptografia: %s\n", *cryptMode)
+
 	switch *mode {
 	case "encrypt":
-		result, err := encryptData(cryptData, *payload)
+		result, err := encryptData(cryptData, *payload, *cryptMode)
 		if err != nil {
 			log.Fatalf("Erro na criptografia: %v", err)
 		}
-		fmt.Printf("Payload criptografado: %s\n", result)
+		fmt.Printf("Payload criptografado (%s): %s\n", *cryptMode, result)
 
 	case "decrypt":
 		result, err := decryptData(cryptData, *payload)
@@ -83,6 +101,8 @@ Uso:
 Flags:
   -mode string
         Modo de operação: 'encrypt' ou 'decrypt' (default "decrypt")
+  -crypt string
+        Modo de criptografia: 'CBC' ou 'GCM' (default "CBC")
   -key string
         Chave de criptografia em Base64 (default usa chave de teste)
   -payload string
@@ -91,28 +111,40 @@ Flags:
   -h    Mostrar esta ajuda
 
 Exemplos:
-  # Descriptografar payload do frontend
+  # Descriptografar payload do frontend (CBC)
   go run main.go -mode decrypt -payload "Base64PayloadAqui"
 
-  # Criptografar dados JSON
-  go run main.go -mode encrypt -payload '{"user":"test","data":"value"}'
+  # Criptografar dados JSON usando GCM
+  go run main.go -mode encrypt -crypt GCM -payload '{"user":"test","data":"value"}'
+
+  # Teste CBC vs GCM
+  go run main.go -mode encrypt -crypt CBC -payload "test data"
+  go run main.go -mode encrypt -crypt GCM -payload "test data"
 
   # Modo interativo
   go run main.go -i
 
-  # Usar chave personalizada
-  go run main.go -key "SuaChaveBase64Aqui" -mode decrypt -payload "PayloadAqui"
+  # Usar chave personalizada com GCM
+  go run main.go -crypt GCM -key "SuaChaveBase64Aqui" -mode decrypt -payload "PayloadAqui"
 `)
 }
 
-func encryptData(cryptData cryptserver.CryptDataInterface, payload string) (string, error) {
+func encryptData(cryptData cryptserver.CryptDataInterface, payload string, mode string) (string, error) {
 	// Converter payload string para bytes
 	jsonData := []byte(payload)
 
-	// Criptografar
-	encrypted, err := cryptData.EncryptPayload(jsonData)
+	// Criptografar usando o modo especificado
+	var encrypted string
+	var err error
+
+	if mode == "GCM" {
+		encrypted, err = cryptData.EncryptPayloadWithMode(jsonData, "GCM")
+	} else {
+		encrypted, err = cryptData.EncryptPayload(jsonData) // Usa modo padrão (CBC)
+	}
+
 	if err != nil {
-		return "", fmt.Errorf("falha na criptografia: %w", err)
+		return "", fmt.Errorf("falha na criptografia %s: %w", mode, err)
 	}
 
 	return encrypted, nil
@@ -155,13 +187,32 @@ func runInteractiveMode() {
 		key = keyInput
 	}
 
-	// Inicializar CryptData
-	cryptData, err := cryptserver.InicializationCryptData(&key)
+	// Solicitar modo de criptografia
+	fmt.Print("Digite o modo de criptografia [CBC/GCM] (Enter para CBC): ")
+	cryptModeInput, _ := reader.ReadString('\n')
+	cryptModeInput = strings.TrimSpace(strings.ToUpper(cryptModeInput))
+
+	cryptMode := "CBC"
+	if cryptModeInput == "GCM" {
+		cryptMode = "GCM"
+	}
+
+	// Inicializar CryptData com modo específico
+	var cryptData cryptserver.CryptDataInterface
+	var err error
+
+	if cryptMode == "CBC" {
+		cryptData, err = cryptserver.InicializationCryptData(&key)
+	} else {
+		cryptData, err = cryptserver.InicializationCryptDataWithMode(&key, cryptMode)
+	}
+
 	if err != nil {
 		log.Fatalf("Erro ao inicializar CryptData: %v", err)
 	}
 
-	fmt.Printf("Usando chave: %s\n\n", key)
+	fmt.Printf("Usando chave: %s\n", key)
+	fmt.Printf("Modo de criptografia: %s\n\n", cryptMode)
 
 	for {
 		fmt.Print("Escolha o modo (encrypt/decrypt): ")
@@ -194,11 +245,11 @@ func runInteractiveMode() {
 
 		switch modeInput {
 		case "encrypt":
-			result, err := encryptData(cryptData, payloadInput)
+			result, err := encryptData(cryptData, payloadInput, cryptMode)
 			if err != nil {
-				fmt.Printf("Erro na criptografia: %v\n", err)
+				fmt.Printf("Erro na criptografia %s: %v\n", cryptMode, err)
 			} else {
-				fmt.Printf("Resultado criptografado:\n%s\n", result)
+				fmt.Printf("Resultado criptografado (%s):\n%s\n", cryptMode, result)
 			}
 
 		case "decrypt":

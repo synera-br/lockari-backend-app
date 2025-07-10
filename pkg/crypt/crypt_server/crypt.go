@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64" // Usado para codificar/decodificar a chave e o payload.
 	"errors"
 	"fmt"
@@ -13,9 +14,18 @@ import (
 	"strings"
 )
 
+// Constantes para modos de criptografia
+const (
+	CryptModeCBC     = "CBC"
+	CryptModeGCM     = "GCM"
+	DefaultCryptMode = CryptModeCBC // Manter compatibilidade
+)
+
 type CryptData struct {
 	Payload    string `json:"payload" binding:"required"`
 	encryptKey *string
+	derivedKey []byte // Chave derivada SHA-256 para compatibilidade com crypt_client
+	cryptMode  string // "CBC" ou "GCM"
 }
 
 func InicializationCryptData(encryptKey *string) (CryptDataInterface, error) {
@@ -52,10 +62,67 @@ func InicializationCryptData(encryptKey *string) (CryptDataInterface, error) {
 	// CRÍTICO: Armazenar a chave LIMPA, não a original
 	data.encryptKey = &newEncryptKey
 
+	// Configurar modo padrão (CBC para compatibilidade)
+	data.cryptMode = DefaultCryptMode
+
 	// Log da chave final armazenada
 	log.Printf("DEBUG: Final stored encrypt key: %q", *data.encryptKey)
+	log.Printf("DEBUG: Initialized with default mode: %s", data.cryptMode)
 
 	return data, nil
+}
+
+// InicializationCryptDataWithMode inicializa CryptData com modo específico (CBC ou GCM)
+func InicializationCryptDataWithMode(encryptKey *string, mode string) (CryptDataInterface, error) {
+	if mode != CryptModeCBC && mode != CryptModeGCM {
+		return nil, fmt.Errorf("invalid crypt mode: %s (must be %s or %s)", mode, CryptModeCBC, CryptModeGCM)
+	}
+
+	// Usar função base de inicialização
+	cryptData, err := InicializationCryptData(encryptKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cast para tipo concreto para acessar campos privados
+	data, ok := cryptData.(*CryptData)
+	if !ok {
+		return nil, errors.New("failed to cast CryptData interface")
+	}
+
+	// Configurar modo de criptografia
+	data.cryptMode = mode
+
+	// Se for modo GCM, derivar chave usando SHA-256 (compatível com crypt_client)
+	if mode == CryptModeGCM {
+		derivedKey, err := data.deriveKeyFromBase64(*data.encryptKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive key for GCM mode: %w", err)
+		}
+		data.derivedKey = derivedKey
+		log.Printf("DEBUG: Derived key for GCM mode: %x", derivedKey[:8]) // Log apenas primeiros 8 bytes por segurança
+	}
+
+	log.Printf("DEBUG: Initialized CryptData with mode: %s", mode)
+
+	return data, nil
+}
+
+// deriveKeyFromBase64 deriva uma chave de 32 bytes usando SHA-256 (compatível com crypt_client)
+func (c *CryptData) deriveKeyFromBase64(base64Key string) ([]byte, error) {
+	// Decodificar Base64 para bytes originais
+	keyBytes, err := base64.StdEncoding.DecodeString(base64Key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base64 key for derivation: %w", err)
+	}
+
+	// Aplicar SHA-256 para derivar chave de 32 bytes
+	hash := sha256.Sum256(keyBytes)
+
+	log.Printf("DEBUG: Key derivation - Original key bytes length: %d", len(keyBytes))
+	log.Printf("DEBUG: Key derivation - Derived key length: %d", len(hash))
+
+	return hash[:], nil
 }
 
 func (c *CryptData) validateTokenFromString(token *string) error {
@@ -108,11 +175,11 @@ func isValidBase64(s string) bool {
 }
 
 // PayloadData é uma função wrapper que descriptografa usando a chave global do pacote.
-// Ela espera que o payload seja uma string Base64 no formato: Base64(bytes_crus_IV + bytes_crus_Ciphertext).
+// Ela espera que o payload seja uma string Base64 e detecta automaticamente o formato (CBC ou GCM).
 // Retorna os dados descriptografados como um slice de bytes ou um erro em caso de falha.
 // Se o token for inválido ou a descriptografia falhar, retorna um erro.
 func (c *CryptData) PayloadData(base64Payload string) ([]byte, error) {
-	log.Println("Decrypting payload with global key...")
+	log.Println("Decrypting payload with automatic format detection...")
 
 	// Validações de entrada (consistentes com o frontend)
 	if base64Payload == "" {
@@ -127,17 +194,38 @@ func (c *CryptData) PayloadData(base64Payload string) ([]byte, error) {
 		return nil, errors.New("decrypt: package key (encryptKey) is empty")
 	}
 
-	log.Println("Using package key for decryption:", *c.encryptKey)
-	decryptedData, err := c.DecryptPayload(base64Payload, *c.encryptKey)
+	// Detectar formato automaticamente
+	detectedMode, err := c.detectPayloadFormat(base64Payload)
 	if err != nil {
-		return nil, fmt.Errorf("decryption failed: %w", err)
+		return nil, fmt.Errorf("format detection failed: %w", err)
+	}
+
+	log.Printf("DEBUG: Detected payload format: %s", detectedMode)
+	log.Printf("DEBUG: Using package key for decryption: %s", *c.encryptKey)
+
+	// Dispatch para método apropriado baseado na detecção
+	var decryptedData []byte
+	switch detectedMode {
+	case CryptModeCBC:
+		decryptedData, err = c.DecryptPayload(base64Payload, *c.encryptKey)
+		if err != nil {
+			return nil, fmt.Errorf("CBC decryption failed: %w", err)
+		}
+	case CryptModeGCM:
+		decryptedData, err = c.DecryptPayloadGCM(base64Payload, *c.encryptKey)
+		if err != nil {
+			return nil, fmt.Errorf("GCM decryption failed: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported payload format: %s", detectedMode)
 	}
 
 	if len(decryptedData) == 0 {
 		return nil, errors.New("decryption resulted in empty data (possible wrong key or corrupted data)")
 	}
-	log.Println("Decryption successful, returning data...")
-	log.Println("Decrypted data size:", len(decryptedData))
+
+	log.Printf("Decryption successful using %s mode, returning data...", detectedMode)
+	log.Printf("Decrypted data size: %d bytes", len(decryptedData))
 
 	return decryptedData, nil
 }
@@ -266,12 +354,84 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 	return unpaddedData, nil
 }
 
-// Helper function para Go < 1.21
-func min(a, b int) int {
-	if a < b {
-		return a
+// DecryptPayloadGCM descriptografa um payload que foi criptografado usando AES-GCM.
+// Espera-se que base64Payload seja Base64(nonce + ciphertext + tag).
+func (c *CryptData) DecryptPayloadGCM(base64Payload string, base64KeyInput string) ([]byte, error) {
+	log.Printf("DEBUG: Starting GCM decryption...")
+
+	// Validações de entrada
+	if base64Payload == "" {
+		return nil, errors.New("decrypt GCM: base64 payload is empty")
 	}
-	return b
+
+	if base64KeyInput == "" {
+		return nil, errors.New("decrypt GCM: base64 key is empty")
+	}
+
+	// Validar formato Base64
+	if !isValidBase64(base64Payload) {
+		return nil, errors.New("decrypt GCM: payload contains invalid Base64 characters")
+	}
+
+	if !isValidBase64(base64KeyInput) {
+		return nil, errors.New("decrypt GCM: key contains invalid Base64 characters")
+	}
+
+	// Derivar chave usando SHA-256 (compatível com crypt_client)
+	derivedKey, err := c.deriveKeyFromBase64(base64KeyInput)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt GCM: failed to derive key: %w", err)
+	}
+
+	log.Printf("DEBUG: GCM using derived key length: %d bytes", len(derivedKey))
+
+	// Decodificar payload
+	combined, err := base64.StdEncoding.DecodeString(base64Payload)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt GCM: failed to decode base64 payload: %w", err)
+	}
+
+	log.Printf("DEBUG: GCM combined bytes length: %d", len(combined))
+
+	// Criar cipher AES
+	block, err := aes.NewCipher(derivedKey)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt GCM: failed to create AES cipher: %w", err)
+	}
+
+	// Criar modo GCM
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt GCM: failed to create GCM mode: %w", err)
+	}
+
+	// Validar tamanho mínimo (nonce + pelo menos algum dado + tag)
+	if len(combined) < gcm.NonceSize() {
+		return nil, fmt.Errorf("decrypt GCM: payload too short to contain nonce (got %d bytes, expected at least %d)", len(combined), gcm.NonceSize())
+	}
+
+	// Extrair nonce e ciphertext (que inclui o tag no final)
+	nonce := combined[:gcm.NonceSize()]
+	ciphertext := combined[gcm.NonceSize():]
+
+	log.Printf("DEBUG: GCM nonce: %x", nonce)
+	log.Printf("DEBUG: GCM ciphertext+tag length: %d", len(ciphertext))
+
+	// Descriptografar e validar autenticação
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt GCM: authentication failed or decryption error: %w", err)
+	}
+
+	// Validar se os dados descriptografados não estão vazios
+	if len(plaintext) == 0 {
+		return nil, errors.New("decrypt GCM: decryption resulted in empty data")
+	}
+
+	log.Printf("DEBUG: GCM decryption successful, plaintext length: %d", len(plaintext))
+	log.Printf("DEBUG: GCM decrypted data preview: %s", string(plaintext[:min(100, len(plaintext))]))
+
+	return plaintext, nil
 }
 
 // pkcs7Pad adiciona padding PKCS7 aos dados.
@@ -353,4 +513,171 @@ func (c *CryptData) EncryptPayload(jsonDataBytes []byte) (string, error) {
 	}
 
 	return base64EncryptedPayload, nil
+}
+
+// EncryptPayloadGCM criptografa os jsonDataBytes fornecidos usando AES-GCM.
+// O output é uma string Base64 no formato: Base64(nonce + ciphertext + tag).
+func (c *CryptData) EncryptPayloadGCM(jsonDataBytes []byte) (string, error) {
+	log.Printf("DEBUG: Starting GCM encryption...")
+
+	// Validações de entrada
+	if len(jsonDataBytes) == 0 {
+		return "", errors.New("encrypt GCM: jsonDataBytes is empty")
+	}
+
+	if c.encryptKey == nil || *c.encryptKey == "" {
+		return "", errors.New("encrypt GCM: package key (encryptKey) is empty")
+	}
+
+	// Usar chave derivada se disponível, senão derivar agora
+	var derivedKey []byte
+	var err error
+
+	if c.derivedKey != nil {
+		derivedKey = c.derivedKey
+		log.Printf("DEBUG: GCM using cached derived key")
+	} else {
+		derivedKey, err = c.deriveKeyFromBase64(*c.encryptKey)
+		if err != nil {
+			return "", fmt.Errorf("encrypt GCM: failed to derive key: %w", err)
+		}
+		log.Printf("DEBUG: GCM derived key on-demand")
+	}
+
+	log.Printf("DEBUG: GCM encryption key length: %d bytes", len(derivedKey))
+
+	// Criar cipher AES
+	block, err := aes.NewCipher(derivedKey)
+	if err != nil {
+		return "", fmt.Errorf("encrypt GCM: failed to create AES cipher: %w", err)
+	}
+
+	// Criar modo GCM
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("encrypt GCM: failed to create GCM mode: %w", err)
+	}
+
+	// Gerar nonce aleatório (12 bytes para GCM)
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", fmt.Errorf("encrypt GCM: failed to generate nonce: %w", err)
+	}
+
+	log.Printf("DEBUG: GCM generated nonce: %x", nonce)
+	log.Printf("DEBUG: GCM plaintext length: %d bytes", len(jsonDataBytes))
+
+	// Criptografar dados (já inclui autenticação/tag automaticamente)
+	ciphertext := gcm.Seal(nil, nonce, jsonDataBytes, nil)
+
+	log.Printf("DEBUG: GCM ciphertext+tag length: %d bytes", len(ciphertext))
+
+	// Combinar nonce + ciphertext+tag
+	combined := append(nonce, ciphertext...)
+
+	// Codificar para Base64
+	base64EncryptedPayload := base64.StdEncoding.EncodeToString(combined)
+
+	// Validação final do resultado
+	if base64EncryptedPayload == "" {
+		return "", errors.New("encrypt GCM: failed to generate Base64 output")
+	}
+
+	log.Printf("DEBUG: GCM encryption successful, Base64 output length: %d", len(base64EncryptedPayload))
+
+	return base64EncryptedPayload, nil
+}
+
+// EncryptPayloadWithMode criptografa jsonDataBytes usando o modo especificado (CBC ou GCM).
+func (c *CryptData) EncryptPayloadWithMode(jsonDataBytes []byte, mode string) (string, error) {
+	log.Printf("DEBUG: Encrypting with mode: %s", mode)
+
+	switch mode {
+	case CryptModeCBC:
+		return c.EncryptPayload(jsonDataBytes) // Usar implementação CBC existente
+	case CryptModeGCM:
+		return c.EncryptPayloadGCM(jsonDataBytes)
+	default:
+		return "", fmt.Errorf("unsupported encryption mode: %s", mode)
+	}
+}
+
+// SetCryptMode define o modo de criptografia (CBC ou GCM)
+func (c *CryptData) SetCryptMode(mode string) error {
+	if mode != CryptModeCBC && mode != CryptModeGCM {
+		return fmt.Errorf("invalid crypt mode: %s (must be %s or %s)", mode, CryptModeCBC, CryptModeGCM)
+	}
+
+	c.cryptMode = mode
+	log.Printf("DEBUG: Crypt mode set to: %s", mode)
+
+	// Se mudou para GCM e não tem chave derivada, derivar agora
+	if mode == CryptModeGCM && c.derivedKey == nil && c.encryptKey != nil {
+		derivedKey, err := c.deriveKeyFromBase64(*c.encryptKey)
+		if err != nil {
+			return fmt.Errorf("failed to derive key for GCM mode: %w", err)
+		}
+		c.derivedKey = derivedKey
+		log.Printf("DEBUG: Derived key for new GCM mode")
+	}
+
+	return nil
+}
+
+// GetCryptMode retorna o modo de criptografia atual
+func (c *CryptData) GetCryptMode() string {
+	if c.cryptMode == "" {
+		return DefaultCryptMode // Retornar padrão se não configurado
+	}
+	return c.cryptMode
+}
+
+// detectPayloadFormat detecta automaticamente se o payload é CBC ou GCM tentando descriptografar
+func (c *CryptData) detectPayloadFormat(base64Payload string) (string, error) {
+	combinedBytes, err := base64.StdEncoding.DecodeString(base64Payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode payload for format detection: %w", err)
+	}
+
+	log.Printf("DEBUG: Format detection - Payload length: %d bytes", len(combinedBytes))
+
+	if len(combinedBytes) < 29 {
+		return "", fmt.Errorf("payload too short for any format: length %d (minimum 29 bytes)", len(combinedBytes))
+	}
+
+	// Estratégia pragmática: tentar GCM primeiro (mais específico)
+	// Se falhar, tentar CBC
+
+	// Tentar GCM primeiro
+	log.Printf("DEBUG: Format detection - Trying GCM first...")
+	_, err = c.DecryptPayloadGCM(base64Payload, *c.encryptKey)
+	if err == nil {
+		log.Printf("DEBUG: Format detection - GCM decryption successful")
+		return CryptModeGCM, nil
+	}
+	log.Printf("DEBUG: Format detection - GCM failed: %v", err)
+
+	// Se GCM falhou, tentar CBC
+	log.Printf("DEBUG: Format detection - Trying CBC...")
+	_, err = c.DecryptPayload(base64Payload, *c.encryptKey)
+	if err == nil {
+		log.Printf("DEBUG: Format detection - CBC decryption successful")
+		return CryptModeCBC, nil
+	}
+	log.Printf("DEBUG: Format detection - CBC failed: %v", err)
+
+	// Se ambos falharam, retornar erro
+	return "", fmt.Errorf("unable to decrypt payload with either CBC or GCM")
+}
+
+// ...existing code...
+
+// ...existing code...
+
+// Helper function para Go < 1.21
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
