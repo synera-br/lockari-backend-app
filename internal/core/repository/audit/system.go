@@ -12,7 +12,8 @@ import (
 )
 
 type auditSystemEvent struct {
-	db database.FirebaseDBInterface
+	db         database.FirebaseDBInterface
+	collection string
 }
 
 func InicializeAuditSystemEventRepository(db database.FirebaseDBInterface) (entity.AuditSystemEventRepository, error) {
@@ -21,7 +22,8 @@ func InicializeAuditSystemEventRepository(db database.FirebaseDBInterface) (enti
 	}
 
 	return &auditSystemEvent{
-		db: db,
+		db:         db,
+		collection: "system_audit",
 	}, nil
 }
 
@@ -35,7 +37,7 @@ func (r *auditSystemEvent) Create(ctx context.Context, audit map[string]interfac
 		return nil, errors.New("invalid audit: no data provided")
 	}
 
-	response, err := r.db.Create(ctx, audit, collectionAuditSystem)
+	response, err := r.db.Create(ctx, audit, r.collection)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audit: %w", err)
 	}

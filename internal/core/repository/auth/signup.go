@@ -11,7 +11,8 @@ import (
 )
 
 type SignupEvent struct {
-	db database.FirebaseDBInterface
+	db         database.FirebaseDBInterface
+	collection string
 }
 
 func InitializeSignupEventRepository(db database.FirebaseDBInterface) (entity.SignupEventRepository, error) {
@@ -25,7 +26,8 @@ func InitializeSignupEventRepository(db database.FirebaseDBInterface) (entity.Si
 	}
 
 	return &SignupEvent{
-		db: db,
+		db:         db,
+		collection: "subscription",
 	}, nil
 }
 
@@ -39,7 +41,7 @@ func (r *SignupEvent) Create(ctx context.Context, signup map[string]interface{})
 	}
 
 	// Save the signup event to the database na coleção correta
-	response, err := r.db.Create(ctx, signup, "tenants")
+	response, err := r.db.Create(ctx, signup, r.collection)
 	if err != nil {
 		return nil, errors.New("failed to save signup event to database: " + err.Error())
 	}
@@ -67,7 +69,7 @@ func (r *SignupEvent) List(ctx context.Context, filter database.Conditional) ([]
 		return nil, errors.New("invalid filters: no value provided")
 	}
 
-	collection, err := core.SetCollection(ctx, "tenants")
+	collection, err := core.SetCollection(ctx, r.collection)
 	if err != nil {
 		return nil, err
 	}
