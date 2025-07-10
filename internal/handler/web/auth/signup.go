@@ -69,6 +69,8 @@ func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...
 }
 
 func (h *signupHandler) Create(c *gin.Context) {
+	log.Println("Creating signup event...")
+	log.Println("Request Headers:", c.Request.Header)
 	c.JSON(200, gin.H{"message": "Signup event created successfully"})
 }
 
