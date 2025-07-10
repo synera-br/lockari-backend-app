@@ -63,7 +63,6 @@ func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...
 }
 
 func (h *signupHandler) Create(c *gin.Context) {
-	log.Println("Creating signup event...")
 	token := c.GetHeader("X-TOKEN")
 
 	_, err := h.tokenJWT.Validate(token)
@@ -117,8 +116,6 @@ func (h *signupHandler) List(c *gin.Context) {
 }
 
 func (h *signupHandler) Extras(c *gin.Context) {
-	log.Println("Handling extras for signup...")
-	log.Println(c.Request.Header)
 
 	var body cryptserver.CryptData
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -127,15 +124,12 @@ func (h *signupHandler) Extras(c *gin.Context) {
 		return
 	}
 
-	log.Println("Received payload:", body)
-	decryptedData, err := h.encryptor.PayloadData(body.Payload)
+	_, err := h.encryptor.PayloadData(body.Payload)
 	if err != nil {
 		log.Println("Error decrypting payload:", err)
 		c.JSON(400, gin.H{"error": "Error processing request data"})
 		return
 	}
-
-	log.Println("Decrypted data:", string(decryptedData))
 
 	c.JSON(200, gin.H{"message": "Extras handled successfully"})
 }
@@ -143,7 +137,6 @@ func (h *signupHandler) Extras(c *gin.Context) {
 func (h *signupHandler) WithJWT(c *gin.Context) {
 	log.Println("Handling signup with JWT...")
 
-	log.Println("Request Headers:", c.Request.Header)
 	// Exemplo de geração de token normal
 
 	c.JSON(200, gin.H{

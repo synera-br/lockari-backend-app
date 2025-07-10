@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 )
 
@@ -34,19 +33,11 @@ func InicializationCryptData(encryptKey *string) (CryptDataInterface, error) {
 		return nil, errors.New("token is nil")
 	}
 
-	// Log da chave original para debug
-	log.Printf("DEBUG: Original encrypt key: %q (length: %d)", *encryptKey, len(*encryptKey))
-	log.Printf("DEBUG: Original encrypt key hex: %x", []byte(*encryptKey))
-
 	// Limpeza AGRESSIVA: remover TODOS os espaços em branco, quebras de linha, \r, \t, etc.
 	newEncryptKey := strings.ReplaceAll(*encryptKey, "\n", "")
 	newEncryptKey = strings.ReplaceAll(newEncryptKey, "\r", "")
 	newEncryptKey = strings.ReplaceAll(newEncryptKey, "\t", "")
 	newEncryptKey = strings.TrimSpace(newEncryptKey)
-
-	// Log da chave após limpeza
-	log.Printf("DEBUG: Cleaned encrypt key: %q (length: %d)", newEncryptKey, len(newEncryptKey))
-	log.Printf("DEBUG: Cleaned encrypt key hex: %x", []byte(newEncryptKey))
 
 	// Validar se a chave após limpeza não ficou vazia
 	if newEncryptKey == "" {
@@ -64,10 +55,6 @@ func InicializationCryptData(encryptKey *string) (CryptDataInterface, error) {
 
 	// Configurar modo padrão (CBC para compatibilidade)
 	data.cryptMode = DefaultCryptMode
-
-	// Log da chave final armazenada
-	log.Printf("DEBUG: Final stored encrypt key: %q", *data.encryptKey)
-	log.Printf("DEBUG: Initialized with default mode: %s", data.cryptMode)
 
 	return data, nil
 }
@@ -100,10 +87,7 @@ func InicializationCryptDataWithMode(encryptKey *string, mode string) (CryptData
 			return nil, fmt.Errorf("failed to derive key for GCM mode: %w", err)
 		}
 		data.derivedKey = derivedKey
-		log.Printf("DEBUG: Derived key for GCM mode: %x", derivedKey[:8]) // Log apenas primeiros 8 bytes por segurança
 	}
-
-	log.Printf("DEBUG: Initialized CryptData with mode: %s", mode)
 
 	return data, nil
 }
@@ -118,9 +102,6 @@ func (c *CryptData) deriveKeyFromBase64(base64Key string) ([]byte, error) {
 
 	// Aplicar SHA-256 para derivar chave de 32 bytes
 	hash := sha256.Sum256(keyBytes)
-
-	log.Printf("DEBUG: Key derivation - Original key bytes length: %d", len(keyBytes))
-	log.Printf("DEBUG: Key derivation - Derived key length: %d", len(hash))
 
 	return hash[:], nil
 }
@@ -179,7 +160,6 @@ func isValidBase64(s string) bool {
 // Retorna os dados descriptografados como um slice de bytes ou um erro em caso de falha.
 // Se o token for inválido ou a descriptografia falhar, retorna um erro.
 func (c *CryptData) PayloadData(base64Payload string) ([]byte, error) {
-	log.Println("Decrypting payload with automatic format detection...")
 
 	// Validações de entrada (consistentes com o frontend)
 	if base64Payload == "" {
@@ -199,9 +179,6 @@ func (c *CryptData) PayloadData(base64Payload string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("format detection failed: %w", err)
 	}
-
-	log.Printf("DEBUG: Detected payload format: %s", detectedMode)
-	log.Printf("DEBUG: Using package key for decryption: %s", *c.encryptKey)
 
 	// Dispatch para método apropriado baseado na detecção
 	var decryptedData []byte
@@ -223,9 +200,6 @@ func (c *CryptData) PayloadData(base64Payload string) ([]byte, error) {
 	if len(decryptedData) == 0 {
 		return nil, errors.New("decryption resulted in empty data (possible wrong key or corrupted data)")
 	}
-
-	log.Printf("Decryption successful using %s mode, returning data...", detectedMode)
-	log.Printf("Decrypted data size: %d bytes", len(decryptedData))
 
 	return decryptedData, nil
 }
@@ -279,17 +253,10 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 		return nil, errors.New("decrypt: key contains invalid Base64 characters")
 	}
 
-	// Log detalhado da chave para debug
-	log.Printf("DEBUG: Raw base64 key input: %q (length: %d)", base64KeyInput, len(base64KeyInput))
-
 	keyBytes, err := base64.StdEncoding.DecodeString(base64KeyInput)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt: failed to decode base64 key: %w", err)
 	}
-
-	log.Printf("DEBUG: Decoded key bytes: %v (length: %d)", keyBytes, len(keyBytes))
-	log.Printf("DEBUG: Key as string: %s", string(keyBytes))
-	log.Printf("DEBUG: Key hex: %x", keyBytes)
 
 	// Validação rigorosa do tamanho da chave (mesma do frontend)
 	switch len(keyBytes) {
@@ -303,9 +270,6 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 		return nil, fmt.Errorf("decrypt: failed to decode base64 payload: %w", err)
 	}
 
-	log.Printf("DEBUG: Combined bytes length: %d", len(combinedBytes))
-	log.Printf("DEBUG: First 32 bytes (IV): %x", combinedBytes[:min(32, len(combinedBytes))])
-
 	// Validação do tamanho mínimo (deve ter pelo menos o IV)
 	if len(combinedBytes) < aes.BlockSize {
 		return nil, fmt.Errorf("decrypt: combined payload too short to contain IV (got %d bytes, expected at least %d)", len(combinedBytes), aes.BlockSize)
@@ -313,9 +277,6 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 
 	iv := combinedBytes[:aes.BlockSize]
 	ciphertext := combinedBytes[aes.BlockSize:]
-
-	log.Printf("DEBUG: IV: %x", iv)
-	log.Printf("DEBUG: Ciphertext length: %d", len(ciphertext))
 
 	// Validar se o ciphertext não está vazio
 	if len(ciphertext) == 0 {
@@ -335,9 +296,6 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(ciphertext, ciphertext) // Descriptografa in-place
 
-	log.Printf("DEBUG: Decrypted ciphertext (before unpadding): %x", ciphertext)
-	log.Printf("DEBUG: Last 16 bytes of decrypted data: %x", ciphertext[len(ciphertext)-16:])
-
 	unpaddedData, err := c.pkcs7Unpad(ciphertext, aes.BlockSize)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt: failed to unpad data: %w", err)
@@ -348,16 +306,12 @@ func (c *CryptData) DecryptPayload(base64Payload string, base64KeyInput string) 
 		return nil, errors.New("decrypt: unpaddedData is empty (possible wrong key or corrupted data)")
 	}
 
-	log.Printf("DEBUG: Final unpaddedData length: %d", len(unpaddedData))
-	log.Printf("DEBUG: Final unpaddedData as string: %s", string(unpaddedData))
-
 	return unpaddedData, nil
 }
 
 // DecryptPayloadGCM descriptografa um payload que foi criptografado usando AES-GCM.
 // Espera-se que base64Payload seja Base64(nonce + ciphertext + tag).
 func (c *CryptData) DecryptPayloadGCM(base64Payload string, base64KeyInput string) ([]byte, error) {
-	log.Printf("DEBUG: Starting GCM decryption...")
 
 	// Validações de entrada
 	if base64Payload == "" {
@@ -383,15 +337,11 @@ func (c *CryptData) DecryptPayloadGCM(base64Payload string, base64KeyInput strin
 		return nil, fmt.Errorf("decrypt GCM: failed to derive key: %w", err)
 	}
 
-	log.Printf("DEBUG: GCM using derived key length: %d bytes", len(derivedKey))
-
 	// Decodificar payload
 	combined, err := base64.StdEncoding.DecodeString(base64Payload)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt GCM: failed to decode base64 payload: %w", err)
 	}
-
-	log.Printf("DEBUG: GCM combined bytes length: %d", len(combined))
 
 	// Criar cipher AES
 	block, err := aes.NewCipher(derivedKey)
@@ -414,9 +364,6 @@ func (c *CryptData) DecryptPayloadGCM(base64Payload string, base64KeyInput strin
 	nonce := combined[:gcm.NonceSize()]
 	ciphertext := combined[gcm.NonceSize():]
 
-	log.Printf("DEBUG: GCM nonce: %x", nonce)
-	log.Printf("DEBUG: GCM ciphertext+tag length: %d", len(ciphertext))
-
 	// Descriptografar e validar autenticação
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
@@ -427,9 +374,6 @@ func (c *CryptData) DecryptPayloadGCM(base64Payload string, base64KeyInput strin
 	if len(plaintext) == 0 {
 		return nil, errors.New("decrypt GCM: decryption resulted in empty data")
 	}
-
-	log.Printf("DEBUG: GCM decryption successful, plaintext length: %d", len(plaintext))
-	log.Printf("DEBUG: GCM decrypted data preview: %s", string(plaintext[:min(100, len(plaintext))]))
 
 	return plaintext, nil
 }
@@ -518,7 +462,6 @@ func (c *CryptData) EncryptPayload(jsonDataBytes []byte) (string, error) {
 // EncryptPayloadGCM criptografa os jsonDataBytes fornecidos usando AES-GCM.
 // O output é uma string Base64 no formato: Base64(nonce + ciphertext + tag).
 func (c *CryptData) EncryptPayloadGCM(jsonDataBytes []byte) (string, error) {
-	log.Printf("DEBUG: Starting GCM encryption...")
 
 	// Validações de entrada
 	if len(jsonDataBytes) == 0 {
@@ -535,16 +478,12 @@ func (c *CryptData) EncryptPayloadGCM(jsonDataBytes []byte) (string, error) {
 
 	if c.derivedKey != nil {
 		derivedKey = c.derivedKey
-		log.Printf("DEBUG: GCM using cached derived key")
 	} else {
 		derivedKey, err = c.deriveKeyFromBase64(*c.encryptKey)
 		if err != nil {
 			return "", fmt.Errorf("encrypt GCM: failed to derive key: %w", err)
 		}
-		log.Printf("DEBUG: GCM derived key on-demand")
 	}
-
-	log.Printf("DEBUG: GCM encryption key length: %d bytes", len(derivedKey))
 
 	// Criar cipher AES
 	block, err := aes.NewCipher(derivedKey)
@@ -564,13 +503,8 @@ func (c *CryptData) EncryptPayloadGCM(jsonDataBytes []byte) (string, error) {
 		return "", fmt.Errorf("encrypt GCM: failed to generate nonce: %w", err)
 	}
 
-	log.Printf("DEBUG: GCM generated nonce: %x", nonce)
-	log.Printf("DEBUG: GCM plaintext length: %d bytes", len(jsonDataBytes))
-
 	// Criptografar dados (já inclui autenticação/tag automaticamente)
 	ciphertext := gcm.Seal(nil, nonce, jsonDataBytes, nil)
-
-	log.Printf("DEBUG: GCM ciphertext+tag length: %d bytes", len(ciphertext))
 
 	// Combinar nonce + ciphertext+tag
 	combined := append(nonce, ciphertext...)
@@ -583,14 +517,11 @@ func (c *CryptData) EncryptPayloadGCM(jsonDataBytes []byte) (string, error) {
 		return "", errors.New("encrypt GCM: failed to generate Base64 output")
 	}
 
-	log.Printf("DEBUG: GCM encryption successful, Base64 output length: %d", len(base64EncryptedPayload))
-
 	return base64EncryptedPayload, nil
 }
 
 // EncryptPayloadWithMode criptografa jsonDataBytes usando o modo especificado (CBC ou GCM).
 func (c *CryptData) EncryptPayloadWithMode(jsonDataBytes []byte, mode string) (string, error) {
-	log.Printf("DEBUG: Encrypting with mode: %s", mode)
 
 	switch mode {
 	case CryptModeCBC:
@@ -609,7 +540,6 @@ func (c *CryptData) SetCryptMode(mode string) error {
 	}
 
 	c.cryptMode = mode
-	log.Printf("DEBUG: Crypt mode set to: %s", mode)
 
 	// Se mudou para GCM e não tem chave derivada, derivar agora
 	if mode == CryptModeGCM && c.derivedKey == nil && c.encryptKey != nil {
@@ -618,7 +548,6 @@ func (c *CryptData) SetCryptMode(mode string) error {
 			return fmt.Errorf("failed to derive key for GCM mode: %w", err)
 		}
 		c.derivedKey = derivedKey
-		log.Printf("DEBUG: Derived key for new GCM mode")
 	}
 
 	return nil
@@ -639,8 +568,6 @@ func (c *CryptData) detectPayloadFormat(base64Payload string) (string, error) {
 		return "", fmt.Errorf("failed to decode payload for format detection: %w", err)
 	}
 
-	log.Printf("DEBUG: Format detection - Payload length: %d bytes", len(combinedBytes))
-
 	if len(combinedBytes) < 29 {
 		return "", fmt.Errorf("payload too short for any format: length %d (minimum 29 bytes)", len(combinedBytes))
 	}
@@ -649,22 +576,16 @@ func (c *CryptData) detectPayloadFormat(base64Payload string) (string, error) {
 	// Se falhar, tentar CBC
 
 	// Tentar GCM primeiro
-	log.Printf("DEBUG: Format detection - Trying GCM first...")
 	_, err = c.DecryptPayloadGCM(base64Payload, *c.encryptKey)
 	if err == nil {
-		log.Printf("DEBUG: Format detection - GCM decryption successful")
 		return CryptModeGCM, nil
 	}
-	log.Printf("DEBUG: Format detection - GCM failed: %v", err)
 
 	// Se GCM falhou, tentar CBC
-	log.Printf("DEBUG: Format detection - Trying CBC...")
 	_, err = c.DecryptPayload(base64Payload, *c.encryptKey)
 	if err == nil {
-		log.Printf("DEBUG: Format detection - CBC decryption successful")
 		return CryptModeCBC, nil
 	}
-	log.Printf("DEBUG: Format detection - CBC failed: %v", err)
 
 	// Se ambos falharam, retornar erro
 	return "", fmt.Errorf("unable to decrypt payload with either CBC or GCM")
