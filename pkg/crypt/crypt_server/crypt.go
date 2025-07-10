@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strings"
 )
 
 type CryptData struct {
@@ -23,8 +24,10 @@ func InicializationCryptData(encryptKey *string) (CryptDataInterface, error) {
 		return nil, errors.New("token is nil")
 	}
 
+	newEncryptKey := strings.TrimSpace(*encryptKey)
+
 	data := &CryptData{}
-	err := data.validateTokenFromString(encryptKey)
+	err := data.validateTokenFromString(&newEncryptKey)
 	if err != nil {
 		return nil, err
 	}
