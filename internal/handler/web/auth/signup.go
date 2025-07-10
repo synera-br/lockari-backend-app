@@ -15,7 +15,7 @@ type signupHandler struct {
 	svc        entity.SignupEventService
 	encryptor  cryptserver.CryptDataInterface
 	authClient authenticator.Authenticator
-	token      tokengen.TokenGenerator
+	tokenJWT   tokengen.TokenGenerator
 }
 
 type SignupHandlerInterface interface {
@@ -29,7 +29,7 @@ func InitializeSignupHandler(
 	svc entity.SignupEventService,
 	encryptData cryptserver.CryptDataInterface,
 	authClient authenticator.Authenticator,
-	token tokengen.TokenGenerator,
+	tokenJWT tokengen.TokenGenerator,
 	routerGroup *gin.RouterGroup,
 	middleware ...gin.HandlerFunc,
 ) SignupHandlerInterface {
@@ -37,7 +37,7 @@ func InitializeSignupHandler(
 		svc:        svc,
 		encryptor:  encryptData,
 		authClient: authClient,
-		token:      token,
+		tokenJWT:   tokenJWT,
 	}
 
 	handler.setupRoutes(routerGroup, middleware...)
@@ -47,7 +47,7 @@ func InitializeSignupHandler(
 func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...gin.HandlerFunc) {
 
 	signupRoutes := routerGroup.Group("/auth/signup")
-	middleware = append(middleware, mid.ValidateToken(&gin.Context{}, h.authClient))
+	middleware = append(middleware, mid.ValidateTokenJWT(h.tokenJWT))
 	for _, mw := range middleware {
 		signupRoutes.Use(mw)
 	}
@@ -57,7 +57,7 @@ func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...
 	signupRoutes.GET("/:id", h.Get)
 
 	extra := routerGroup.Group("/api/v1/auth/signup")
-	middleware = append(middleware, mid.ValidateToken(&gin.Context{}, h.authClient))
+	middleware = append(middleware, mid.ValidateTokenJWT(h.tokenJWT))
 	for _, mw := range middleware {
 		extra.Use(mw)
 	}

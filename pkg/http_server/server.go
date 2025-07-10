@@ -64,7 +64,7 @@ func (s *RestAPI) MiddlewareHeader(c *gin.Context) {
 	log.Println("Request Headers:", c.Request.Header)
 	authorization := c.GetHeader("X-AUTHORIZATION")
 	token := c.GetHeader("X-TOKEN")
-	app := c.GetHeader("X-App")
+	app := c.GetHeader("X-APP")
 
 	if authorization == "" && token == "" {
 		c.Errors = append(c.Errors, &gin.Error{
