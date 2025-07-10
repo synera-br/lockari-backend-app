@@ -72,10 +72,7 @@ func (h *auditSystemEventHandler) setupRoutes(routerGroup *gin.RouterGroup, midd
 
 func (h *auditSystemEventHandler) Create(c *gin.Context) {
 
-	log.Println("Handling audit event creation...")
-
 	token := c.GetHeader("X-TOKEN")
-	h.token.Validate(token)
 
 	_, err := h.token.Validate(token)
 	if err != nil {
@@ -90,16 +87,13 @@ func (h *auditSystemEventHandler) Create(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "Invalid request payload"})
 		return
 	}
-	log.Println("Received body:", body)
-	log.Println("Size of Payload:", len(body.Payload))
+
 	decryptedData, err := h.encryptor.PayloadData(body.Payload)
 	if err != nil {
 		log.Println("Error decrypting payload:", err)
 		c.JSON(400, gin.H{"error": "Error processing request data"})
 		return
 	}
-
-	log.Println("Received payload:", decryptedData)
 
 	var auditEvent entity.AuditSystemEvent
 	if err := json.Unmarshal(decryptedData, &auditEvent); err != nil {
@@ -109,15 +103,14 @@ func (h *auditSystemEventHandler) Create(c *gin.Context) {
 	}
 
 	ctx := context.WithValue(c.Request.Context(), "token", token)
-	auditEventResult, err := h.svc.Create(ctx, &auditEvent)
+	_, err = h.svc.Create(ctx, &auditEvent)
 	if err != nil {
 		log.Println("Error creating audit event:", err)
 		c.JSON(500, gin.H{"error": "Failed to create audit event"})
 		return
 	}
 
-	log.Println("Audit event created successfully:", auditEventResult)
-	c.JSON(http.StatusOK, gin.H{})
+	c.JSON(http.StatusOK, gin.H{"message": "Audit event created successfully"})
 }
 
 func (w *auditSystemEventHandler) Get(c *gin.Context) {

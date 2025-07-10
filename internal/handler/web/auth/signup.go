@@ -1,7 +1,10 @@
 package webhandler
 
 import (
+	"context"
+	"encoding/json"
 	"log"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	entity "github.com/synera-br/lockari-backend-app/internal/core/entity/auth"
@@ -60,8 +63,47 @@ func (h *signupHandler) setupRoutes(routerGroup *gin.RouterGroup, middleware ...
 
 func (h *signupHandler) Create(c *gin.Context) {
 	log.Println("Creating signup event...")
-	log.Println("Request Headers:", c.Request.Header)
-	c.JSON(200, gin.H{"message": "Signup event created successfully"})
+	token := c.GetHeader("X-TOKEN")
+
+	_, err := h.tokenJWT.Validate(token)
+	if err != nil {
+		log.Println("Error validating tokenJWT:", err)
+		c.JSON(401, gin.H{"error": "Invalid or expired tokenJWT"})
+		return
+	}
+
+	var body cryptserver.CryptData
+	if err := c.ShouldBindJSON(&body); err != nil {
+		log.Println("Error binding JSON:", err)
+		c.JSON(400, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	decryptedData, err := h.encryptor.PayloadData(body.Payload)
+	if err != nil {
+		log.Println("Error decrypting payload:", err)
+		c.JSON(400, gin.H{"error": "Error processing request data"})
+		return
+	}
+
+	var signup entity.Signup
+	if err := json.Unmarshal(decryptedData, &signup); err != nil {
+		log.Println("Error unmarshalling signup event:", err)
+		c.JSON(400, gin.H{"error": "Invalid signup event data"})
+		return
+	}
+
+	signupEvent, err := entity.NewSignup()
+
+	ctx := context.WithValue(c.Request.Context(), "token", token)
+	_, err = h.svc.Create(ctx, signup)
+	if err != nil {
+		log.Println("Error creating signup event:", err)
+		c.JSON(500, gin.H{"error": "Failed to create signup event"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Signup event created successfully"})
 }
 
 func (h *signupHandler) Get(c *gin.Context) {

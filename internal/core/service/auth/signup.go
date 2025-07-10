@@ -33,54 +33,71 @@ func InitializeSignupEventService(repo entity.SignupEventRepository, auth authen
 	}, nil
 }
 
-func (s *SignupEvent) Create(ctx context.Context, signup entity.SignupEvent) (entity.SignupEvent, error) {
-	if err := signup.IsValid(); err != nil {
+func (s *SignupEvent) Create(ctx context.Context, signupData *entity.Signup) (entity.SignupEvent, error) {
+	// CHECK STRUCTURE
+	if signupData == nil {
+		return nil, core.ErrGenericError("Signup event is required")
+	}
+
+	if err := signupData.IsValid(); err != nil {
 		return nil, core.ErrGenericError("Invalid signup event")
 	}
 
+	// CHECK CONTEXT
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
 	}
 
 	token := utils.GetTokenFromContext(ctx, s.auth) // Ensure user ID is retrieved from context
 
-	user := signup.GetUser()
 	userFromToken, err := s.auth.GetUserID(ctx, token)
 	if err != nil {
 		return nil, fmt.Errorf(utils.ContextCancelled, ctx.Err().Error())
 	}
 
-	if userFromToken != user.Uid {
+	if userFromToken != signupData.User.Uid {
 		return nil, core.ErrUnauthorized("User ID does not match signup event user ID")
 	}
 
-	// Verificar se o usuário já possui um tenant
+	// CHECK IF USER ALREADY HAS A TENANT
 	existingTenant, err := s.auth.GetTenant(ctx, token)
 	if err == nil && existingTenant != "" {
 		return nil, core.ErrGenericError("User already has a tenant assigned")
 	}
 
+	// CHECK USER FROM INTERFACE
 	tenantId := utils.GenerateTenant()
 
-	// Log da geração do tenant para auditoria
-	log.Printf("Generated tenant %s for user %s", tenantId, userFromToken)
+	signup := entity.NewSignup(signupData.User, signupData.ClientInfo, tenantId)
+	if signup == nil {
+		return nil, core.ErrGenericError("Failed to create signup event")
+	}
+
+	if err := signup.IsValid(); err != nil {
+		return nil, core.ErrGenericError("Invalid signup event")
+	}
 
 	err = signup.SetTenant(&tenantId)
 	if err != nil {
 		return nil, err
 	}
 
+	// Log da geração do tenant para auditoria
+	log.Printf("Generated tenant %s for user %s", tenantId, userFromToken)
+
+	// SET TENANT ID AT FIREBASE AUTHENTICATION
 	err = s.auth.SetTenantId(ctx, userFromToken, tenantId)
 	if err != nil {
 		return nil, core.ErrGenericError("Failed to set tenant ID")
 	}
 
+	// CONVERT SIGNUP TO MAP
 	data, err := utils.StructToMap(signup.GetSignup())
 	if err != nil {
 		return nil, core.ErrGenericError("Failed to convert signup data to map")
 	}
 
-	// Tentar criar no repository
+	// CREATE SIGNUP EVENT
 	result, err := s.repo.Create(ctx, data)
 	if err != nil {
 		// Salvar o erro original antes de tentar rollback

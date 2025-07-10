@@ -10,14 +10,14 @@ import (
 
 // SignupEventRepository interface defines methods for store and retrieve signup events
 type SignupEventRepository interface {
-	Create(ctx context.Context, filters map[string]interface{}) (SignupEvent, error)
-	Get(ctx context.Context, filters database.Conditional) (SignupEvent, error)
-	List(ctx context.Context, filters database.Conditional) ([]SignupEvent, error)
+	Create(ctx context.Context, filters map[string]interface{}) (*Signup, error)
+	Get(ctx context.Context, filters database.Conditional) (*Signup, error)
+	List(ctx context.Context, filters database.Conditional) ([]Signup, error)
 }
 
 // SignupEventService interface defines methods for handling signup events
 type SignupEventService interface {
-	Create(ctx context.Context, signup SignupEvent) (SignupEvent, error)
+	Create(ctx context.Context, signup *Signup) (SignupEvent, error)
 	Get(ctx context.Context, id string) (SignupEvent, error)
 	List(context.Context) ([]SignupEvent, error)
 }
@@ -86,8 +86,12 @@ func (s *Signup) SetTenant(tenant *string) error {
 		return errors.New("invalid signup: tenant cannot be empty")
 	}
 
-	if len(*tenant) > 16 {
-		return errors.New("invalid signup: tenant exceeds maximum length of 16 characters")
+	if len(*tenant) != 36 {
+		return errors.New("invalid signup: tenant must be a valid UUID")
+	}
+
+	if s.Tenant == *tenant {
+		return nil
 	}
 
 	s.Tenant = *tenant
