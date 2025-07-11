@@ -883,437 +883,755 @@ type BackupStorage struct {
 }
 ```
 
-## 🔧 Interfaces de Repositório
-
-### Repository Interfaces
+### 17. **Token** - Token de API para Automação
 
 ```go
-// internal/core/repository/user.go
+// internal/core/entity/token.go
+package entity
+
+import (
+    "errors"
+    "time"
+)
+
+type Token struct {
+    ID            string                 `json:"id" firestore:"id"`
+    Name          string                 `json:"name" firestore:"name" validate:"required,min=2,max=100"`
+    Description   string                 `json:"description,omitempty" firestore:"description"`
+    TenantID      string                 `json:"tenantId" firestore:"tenantId" validate:"required"`
+    CreatedBy     string                 `json:"createdBy" firestore:"createdBy" validate:"required"`
+    VaultIDs      []string               `json:"vaultIds" firestore:"vaultIds" validate:"required,min=1"`
+    Permissions   TokenPermissions       `json:"permissions" firestore:"permissions"`
+    Restrictions  TokenRestrictions      `json:"restrictions" firestore:"restrictions"`
+    Usage         TokenUsage             `json:"usage" firestore:"usage"`
+    Security      TokenSecurity          `json:"security" firestore:"security"`
+    HashedToken   string                 `json:"hashedToken" firestore:"hashedToken" validate:"required"`
+    LastUsedAt    *time.Time             `json:"lastUsedAt,omitempty" firestore:"lastUsedAt"`
+    UsageCount    int                    `json:"usageCount" firestore:"usageCount"`
+    IsActive      bool                   `json:"isActive" firestore:"isActive"`
+    IsRevoked     bool                   `json:"isRevoked" firestore:"isRevoked"`
+    CreatedAt     time.Time              `json:"createdAt" firestore:"createdAt"`
+    UpdatedAt     time.Time              `json:"updatedAt" firestore:"updatedAt"`
+    ExpiresAt     *time.Time             `json:"expiresAt,omitempty" firestore:"expiresAt"`
+}
+
+type TokenPermissions struct {
+    CanRead       bool                   `json:"canRead" firestore:"canRead"`
+    CanWrite      bool                   `json:"canWrite" firestore:"canWrite"`
+    CanDelete     bool                   `json:"canDelete" firestore:"canDelete"`
+    CanManage     bool                   `json:"canManage" firestore:"canManage"`
+    CanBackup     bool                   `json:"canBackup" firestore:"canBackup"`
+    CanAudit      bool                   `json:"canAudit" firestore:"canAudit"`
+    ReadOnly      bool                   `json:"readOnly" firestore:"readOnly"`
+    Scopes        []string               `json:"scopes" firestore:"scopes"` // specific operations
+}
+
+type TokenRestrictions struct {
+    IPWhitelist   []string               `json:"ipWhitelist" firestore:"ipWhitelist"`
+    UserAgent     string                 `json:"userAgent,omitempty" firestore:"userAgent"`
+    RateLimit     TokenRateLimit         `json:"rateLimit" firestore:"rateLimit"`
+    TimeWindow    TokenTimeWindow        `json:"timeWindow" firestore:"timeWindow"`
+    Environment   []string               `json:"environment" firestore:"environment"` // prod, dev, staging
+}
+
+type TokenRateLimit struct {
+    Enabled       bool                   `json:"enabled" firestore:"enabled"`
+    RequestsPerHour int                  `json:"requestsPerHour" firestore:"requestsPerHour"`
+    RequestsPerDay  int                  `json:"requestsPerDay" firestore:"requestsPerDay"`
+    BurstLimit    int                    `json:"burstLimit" firestore:"burstLimit"`
+}
+
+type TokenTimeWindow struct {
+    Enabled       bool                   `json:"enabled" firestore:"enabled"`
+    StartTime     string                 `json:"startTime,omitempty" firestore:"startTime"` // HH:MM
+    EndTime       string                 `json:"endTime,omitempty" firestore:"endTime"`     // HH:MM
+    DaysOfWeek    []string               `json:"daysOfWeek,omitempty" firestore:"daysOfWeek"` // mon, tue, etc
+    Timezone      string                 `json:"timezone,omitempty" firestore:"timezone"`
+}
+
+type TokenUsage struct {
+    TotalRequests    int                 `json:"totalRequests" firestore:"totalRequests"`
+    LastRequestAt    *time.Time          `json:"lastRequestAt,omitempty" firestore:"lastRequestAt"`
+    LastRequestIP    string              `json:"lastRequestIP,omitempty" firestore:"lastRequestIP"`
+    LastUserAgent    string              `json:"lastUserAgent,omitempty" firestore:"lastUserAgent"`
+    SuccessfulReqs   int                 `json:"successfulReqs" firestore:"successfulReqs"`
+    FailedReqs       int                 `json:"failedReqs" firestore:"failedReqs"`
+    RateLimitHits    int                 `json:"rateLimitHits" firestore:"rateLimitHits"`
+}
+
+type TokenSecurity struct {
+    RequireHTTPS     bool                `json:"requireHTTPS" firestore:"requireHTTPS"`
+    AllowedOrigins   []string            `json:"allowedOrigins,omitempty" firestore:"allowedOrigins"`
+    RequireUserAgent bool                `json:"requireUserAgent" firestore:"requireUserAgent"`
+    LogAllRequests   bool                `json:"logAllRequests" firestore:"logAllRequests"`
+    AlertOnSuspicious bool               `json:"alertOnSuspicious" firestore:"alertOnSuspicious"`
+}
+
+// Métodos de validação e controle
+func (t *Token) IsValid() bool {
+    if t.IsRevoked || !t.IsActive {
+        return false
+    }
+    
+    if t.ExpiresAt != nil && t.ExpiresAt.Before(time.Now()) {
+        return false
+    }
+    
+    return true
+}
+
+func (t *Token) IsExpired() bool {
+    return t.ExpiresAt != nil && t.ExpiresAt.Before(time.Now())
+}
+
+func (t *Token) CanAccessVault(vaultID string) bool {
+    for _, id := range t.VaultIDs {
+        if id == vaultID {
+            return true
+        }
+    }
+    return false
+}
+
+func (t *Token) Revoke() {
+    t.IsRevoked = true
+    t.UpdatedAt = time.Now()
+}
+
+func (t *Token) Activate() {
+    t.IsActive = true
+    t.UpdatedAt = time.Now()
+}
+
+func (t *Token) Deactivate() {
+    t.IsActive = false
+    t.UpdatedAt = time.Now()
+}
+
+func (t *Token) RecordUsage(ip, userAgent string, success bool) {
+    t.Usage.TotalRequests++
+    t.Usage.LastRequestAt = &time.Time{}
+    *t.Usage.LastRequestAt = time.Now()
+    t.Usage.LastRequestIP = ip
+    t.Usage.LastUserAgent = userAgent
+    t.LastUsedAt = t.Usage.LastRequestAt
+    t.UsageCount++
+    
+    if success {
+        t.Usage.SuccessfulReqs++
+    } else {
+        t.Usage.FailedReqs++
+    }
+    
+    t.UpdatedAt = time.Now()
+}
+
+func (t *Token) CheckRateLimit() error {
+    if !t.Restrictions.RateLimit.Enabled {
+        return nil
+    }
+    
+    // Implementar lógica de rate limiting
+    // Esta seria uma implementação simplificada
+    if t.Usage.TotalRequests >= t.Restrictions.RateLimit.RequestsPerDay {
+        t.Usage.RateLimitHits++
+        return errors.New("daily rate limit exceeded")
+    }
+    
+    return nil
+}
+
+func (t *Token) CheckTimeWindow() error {
+    if !t.Restrictions.TimeWindow.Enabled {
+        return nil
+    }
+    
+    now := time.Now()
+    
+    // Verificar dia da semana
+    if len(t.Restrictions.TimeWindow.DaysOfWeek) > 0 {
+        currentDay := now.Weekday().String()[:3] // Mon, Tue, etc
+        allowed := false
+        for _, day := range t.Restrictions.TimeWindow.DaysOfWeek {
+            if strings.ToLower(day) == strings.ToLower(currentDay) {
+                allowed = true
+                break
+            }
+        }
+        if !allowed {
+            return errors.New("token not allowed on this day of week")
+        }
+    }
+    
+    // Verificar horário (implementação simplificada)
+    if t.Restrictions.TimeWindow.StartTime != "" && t.Restrictions.TimeWindow.EndTime != "" {
+        // Lógica de verificação de horário seria implementada aqui
+        return nil
+    }
+    
+    return nil
+}
+
+func (t *Token) CheckIPWhitelist(ip string) error {
+    if len(t.Restrictions.IPWhitelist) == 0 {
+        return nil
+    }
+    
+    for _, allowedIP := range t.Restrictions.IPWhitelist {
+        if allowedIP == ip {
+            return nil
+        }
+    }
+    
+    return errors.New("IP not in whitelist")
+}
+
+func (t *Token) GetOpenFGAID() string {
+    return "token:" + t.ID
+}
+
+func (t *Token) HasPermission(permission string) bool {
+    switch permission {
+    case "read":
+        return t.Permissions.CanRead
+    case "write":
+        return t.Permissions.CanWrite && !t.Permissions.ReadOnly
+    case "delete":
+        return t.Permissions.CanDelete && !t.Permissions.ReadOnly
+    case "manage":
+        return t.Permissions.CanManage && !t.Permissions.ReadOnly
+    case "backup":
+        return t.Permissions.CanBackup
+    case "audit":
+        return t.Permissions.CanAudit
+    default:
+        return false
+    }
+}
+
+func (t *Token) HasScope(scope string) bool {
+    for _, s := range t.Permissions.Scopes {
+        if s == scope {
+            return true
+        }
+    }
+    return false
+}
+```
+```go
+// internal/core/repository/token_repository.go
 package repository
 
 import (
     "context"
-    "github.com/lockari/internal/core/entity"
+    "github.com/yourusername/yourproject/internal/core/entity"
 )
 
-type UserRepository interface {
-    Create(ctx context.Context, user *entity.User) error
-    GetByID(ctx context.Context, id string) (*entity.User, error)
-    GetByEmail(ctx context.Context, email string) (*entity.User, error)
-    Update(ctx context.Context, user *entity.User) error
+type TokenRepository interface {
+    Create(ctx context.Context, token *entity.Token) error
+    GetByID(ctx context.Context, id string) (*entity.Token, error)
+    GetByHash(ctx context.Context, hashedToken string) (*entity.Token, error)
+    Update(ctx context.Context, token *entity.Token) error
     Delete(ctx context.Context, id string) error
-    List(ctx context.Context, limit, offset int) ([]*entity.User, error)
-}
-
-type TenantRepository interface {
-    Create(ctx context.Context, tenant *entity.Tenant) error
-    GetByID(ctx context.Context, id string) (*entity.Tenant, error)
-    GetBySlug(ctx context.Context, slug string) (*entity.Tenant, error)
-    Update(ctx context.Context, tenant *entity.Tenant) error
-    Delete(ctx context.Context, id string) error
-    List(ctx context.Context, limit, offset int) ([]*entity.Tenant, error)
-    GetUserTenants(ctx context.Context, userID string) ([]*entity.Tenant, error)
-}
-
-type VaultRepository interface {
-    Create(ctx context.Context, vault *entity.Vault) error
-    GetByID(ctx context.Context, id string) (*entity.Vault, error)
-    Update(ctx context.Context, vault *entity.Vault) error
-    Delete(ctx context.Context, id string) error
-    ListByTenant(ctx context.Context, tenantID string, limit, offset int) ([]*entity.Vault, error)
-    ListByUser(ctx context.Context, userID string, limit, offset int) ([]*entity.Vault, error)
-}
-
-type ObjectRepository interface {
-    Create(ctx context.Context, object *entity.Object) error
-    GetByID(ctx context.Context, id string) (*entity.Object, error)
-    Update(ctx context.Context, object *entity.Object) error
-    Delete(ctx context.Context, id string) error
-    ListByVault(ctx context.Context, vaultID string, limit, offset int) ([]*entity.Object, error)
-    Search(ctx context.Context, tenantID, query string, limit, offset int) ([]*entity.Object, error)
-}
-
-type TagRepository interface {
-    Create(ctx context.Context, tag *entity.Tag) error
-    GetByID(ctx context.Context, id string) (*entity.Tag, error)
-    GetByName(ctx context.Context, tenantID, name string) (*entity.Tag, error)
-    Update(ctx context.Context, tag *entity.Tag) error
-    Delete(ctx context.Context, id string) error
-    ListByTenant(ctx context.Context, tenantID string, limit, offset int) ([]*entity.Tag, error)
-    ListByCategory(ctx context.Context, tenantID, category string, limit, offset int) ([]*entity.Tag, error)
-    GetSystemTags() ([]*entity.Tag, error)
-    IncrementUsage(ctx context.Context, tagID string) error
-    DecrementUsage(ctx context.Context, tagID string) error
-}
-
-type AuditLogRepository interface {
-    Create(ctx context.Context, log *entity.AuditLog) error
-    List(ctx context.Context, tenantID string, filters map[string]interface{}, limit, offset int) ([]*entity.AuditLog, error)
-    GetByUser(ctx context.Context, userID string, limit, offset int) ([]*entity.AuditLog, error)
-    GetByResource(ctx context.Context, resourceType, resourceID string, limit, offset int) ([]*entity.AuditLog, error)
+    ListByTenant(ctx context.Context, tenantID string, limit, offset int) ([]*entity.Token, error)
+    ListByUser(ctx context.Context, userID string, limit, offset int) ([]*entity.Token, error)
+    ListByVault(ctx context.Context, vaultID string, limit, offset int) ([]*entity.Token, error)
+    RevokeByUser(ctx context.Context, userID string) error
+    RevokeByVault(ctx context.Context, vaultID string) error
+    GetActiveTokens(ctx context.Context, tenantID string) ([]*entity.Token, error)
+    GetExpiredTokens(ctx context.Context) ([]*entity.Token, error)
+    RecordUsage(ctx context.Context, tokenID, ip, userAgent string, success bool) error
 }
 ```
-
-## 🔐 Services de Autorização
-
-### Authorization Service
-
 ```go
-// internal/core/services/authorization.go
+// internal/core/services/token.go
 package services
 
 import (
     "context"
+    "crypto/rand"
+    "crypto/sha256"
+    "encoding/hex"
+    "errors"
     "fmt"
+    "time"
+    
     "github.com/lockari/internal/core/entity"
     "github.com/lockari/internal/core/repository"
 )
 
-type AuthorizationService struct {
-    openFGAClient OpenFGAClient
-    userRepo      repository.UserRepository
-    tenantRepo    repository.TenantRepository
+type TokenService struct {
+    tokenRepo  repository.TokenRepository
+    vaultRepo  repository.VaultRepository
+    auditRepo  repository.AuditLogRepository
+    authzService *AuthorizationService
 }
 
-func NewAuthorizationService(
-    openFGAClient OpenFGAClient,
-    userRepo repository.UserRepository,
-    tenantRepo repository.TenantRepository,
-) *AuthorizationService {
-    return &AuthorizationService{
-        openFGAClient: openFGAClient,
-        userRepo:      userRepo,
-        tenantRepo:    tenantRepo,
+func NewTokenService(
+    tokenRepo repository.TokenRepository,
+    vaultRepo repository.VaultRepository,
+    auditRepo repository.AuditLogRepository,
+    authzService *AuthorizationService,
+) *TokenService {
+    return &TokenService{
+        tokenRepo:    tokenRepo,
+        vaultRepo:    vaultRepo,
+        auditRepo:    auditRepo,
+        authzService: authzService,
     }
 }
 
-func (s *AuthorizationService) CheckPermission(
-    ctx context.Context,
-    userID string,
-    permission string,
-    resourceType string,
-    resourceID string,
-) (bool, error) {
-    return s.openFGAClient.Check(ctx, &CheckRequest{
-        User:     fmt.Sprintf("user:%s", userID),
-        Relation: permission,
-        Object:   fmt.Sprintf("%s:%s", resourceType, resourceID),
-    })
-}
-
-func (s *AuthorizationService) ListUserObjects(
-    ctx context.Context,
-    userID string,
-    permission string,
-    objectType string,
-) ([]string, error) {
-    return s.openFGAClient.ListObjects(ctx, &ListObjectsRequest{
-        User:     fmt.Sprintf("user:%s", userID),
-        Relation: permission,
-        Type:     objectType,
-    })
-}
-
-// Estruturas auxiliares para OpenFGA
-type CheckRequest struct {
-    User     string `json:"user"`
-    Relation string `json:"relation"`
-    Object   string `json:"object"`
-}
-
-type ListObjectsRequest struct {
-    User     string `json:"user"`
-    Relation string `json:"relation"`
-    Type     string `json:"type"`
-}
-
-type OpenFGAClient interface {
-    Check(ctx context.Context, req *CheckRequest) (bool, error)
-    ListObjects(ctx context.Context, req *ListObjectsRequest) ([]string, error)
-}
-```
-
-### Tag Service
-
-```go
-// internal/core/services/tag.go
-package services
-
-import (
-    "context"
-    "strings"
-    "github.com/lockari/internal/core/entity"
-    "github.com/lockari/internal/core/repository"
-)
-
-type TagService struct {
-    tagRepo repository.TagRepository
-}
-
-func NewTagService(tagRepo repository.TagRepository) *TagService {
-    return &TagService{tagRepo: tagRepo}
-}
-
-func (s *TagService) CreateTag(ctx context.Context, tag *entity.Tag) error {
-    // Normalizar nome
-    tag.Name = s.normalizeTagName(tag.Name)
-    
-    // Verificar se já existe
-    existingTag, err := s.tagRepo.GetByName(ctx, tag.TenantID, tag.Name)
-    if err == nil && existingTag != nil {
-        return errors.New("tag already exists")
-    }
-    
-    return s.tagRepo.Create(ctx, tag)
-}
-
-func (s *TagService) GetOrCreateTag(ctx context.Context, tenantID, tagName string) (*entity.Tag, error) {
-    normalizedName := s.normalizeTagName(tagName)
-    
-    // Tentar buscar tag existente
-    tag, err := s.tagRepo.GetByName(ctx, tenantID, normalizedName)
-    if err == nil && tag != nil {
-        return tag, nil
-    }
-    
-    // Criar nova tag
-    newTag := &entity.Tag{
-        TenantID:  tenantID,
-        Name:      normalizedName,
-        Type:      entity.TagTypeCustom,
-        IsActive:  true,
-        CreatedAt: time.Now(),
-        UpdatedAt: time.Now(),
-    }
-    
-    err = s.tagRepo.Create(ctx, newTag)
-    if err != nil {
-        return nil, err
-    }
-    
-    return newTag, nil
-}
-
-func (s *TagService) GetSuggestedTags(ctx context.Context, tenantID string, query string) ([]*entity.Tag, error) {
-    tags, err := s.tagRepo.ListByTenant(ctx, tenantID, 50, 0)
-    if err != nil {
-        return nil, err
-    }
-    
-    var suggested []*entity.Tag
-    query = strings.ToLower(query)
-    
-    for _, tag := range tags {
-        if strings.Contains(strings.ToLower(tag.Name), query) {
-            suggested = append(suggested, tag)
+func (s *TokenService) CreateToken(ctx context.Context, userID, tenantID string, req *CreateTokenRequest) (*entity.Token, string, error) {
+    // Verificar se o usuário pode gerenciar os vaults especificados
+    for _, vaultID := range req.VaultIDs {
+        allowed, err := s.authzService.CheckPermission(ctx, userID, "can_manage", "vault", vaultID)
+        if err != nil {
+            return nil, "", err
+        }
+        if !allowed {
+            return nil, "", errors.New("permission denied for vault: " + vaultID)
         }
     }
     
-    return suggested, nil
+    // Gerar token único
+    tokenValue, hashedToken, err := s.generateToken()
+    if err != nil {
+        return nil, "", err
+    }
+    
+    // Criar entidade do token
+    token := &entity.Token{
+        ID:           generateID(),
+        Name:         req.Name,
+        Description:  req.Description,
+        TenantID:     tenantID,
+        CreatedBy:    userID,
+        VaultIDs:     req.VaultIDs,
+        Permissions:  req.Permissions,
+        Restrictions: req.Restrictions,
+        Security:     req.Security,
+        HashedToken:  hashedToken,
+        IsActive:     true,
+        IsRevoked:    false,
+        CreatedAt:    time.Now(),
+        UpdatedAt:    time.Now(),
+        ExpiresAt:    req.ExpiresAt,
+    }
+    
+    // Salvar no banco
+    err = s.tokenRepo.Create(ctx, token)
+    if err != nil {
+        return nil, "", err
+    }
+    
+    // Criar relacionamentos no OpenFGA
+    err = s.createTokenRelationships(ctx, token)
+    if err != nil {
+        // Rollback se falhar
+        s.tokenRepo.Delete(ctx, token.ID)
+        return nil, "", err
+    }
+    
+    // Log de auditoria
+    s.auditRepo.Create(ctx, &entity.AuditLog{
+        TenantID:     tenantID,
+        UserID:       userID,
+        Action:       "token_created",
+        ResourceType: "token",
+        ResourceID:   token.ID,
+        ResourceName: token.Name,
+        Result:       entity.AuditResultSuccess,
+        Risk:         entity.RiskLow,
+        Timestamp:    time.Now(),
+    })
+    
+    return token, tokenValue, nil
 }
 
-func (s *TagService) normalizeTagName(name string) string {
-    return strings.ToLower(strings.TrimSpace(name))
-}
-```
-
-## 🎯 Validação e Transformação
-
-### DTO Structs
-
-```go
-// internal/adapters/http/dto/vault.go
-package dto
-
-import (
-    "time"
-    "github.com/lockari/internal/core/entity"
-)
-
-type CreateVaultRequest struct {
-    Name        string   `json:"name" validate:"required,min=2,max=100"`
-    Description string   `json:"description,omitempty"`
-    Icon        string   `json:"icon,omitempty"`
-    Color       string   `json:"color,omitempty" validate:"omitempty,hexcolor"`
-    Tags        []string `json:"tags,omitempty" validate:"max=5"`
+func (s *TokenService) ValidateToken(ctx context.Context, tokenValue string) (*entity.Token, error) {
+    hashedToken := s.hashToken(tokenValue)
+    
+    token, err := s.tokenRepo.GetByHash(ctx, hashedToken)
+    if err != nil {
+        return nil, errors.New("invalid token")
+    }
+    
+    if !token.IsValid() {
+        return nil, errors.New("token is invalid, revoked or expired")
+    }
+    
+    return token, nil
 }
 
-type CreateSecretRequest struct {
-    Name        string                 `json:"name" validate:"required,min=1,max=200"`
-    Description string                 `json:"description,omitempty"`
-    Type        entity.SecretType      `json:"type" validate:"required"`
-    Value       string                 `json:"value" validate:"required"`
-    Metadata    entity.SecretMetadata  `json:"metadata,omitempty"`
-    Tags        []string               `json:"tags,omitempty" validate:"max=5"`
-    IsSensitive bool                   `json:"isSensitive"`
+func (s *TokenService) AuthorizeTokenAction(ctx context.Context, token *entity.Token, action, resourceType, resourceID string) error {
+    // Verificar se o token pode acessar o vault
+    if resourceType == "vault" {
+        if !token.CanAccessVault(resourceID) {
+            return errors.New("token cannot access this vault")
+        }
+    }
+    
+    // Verificar permissões específicas
+    if !token.HasPermission(action) {
+        return errors.New("token does not have permission for this action")
+    }
+    
+    // Verificar restrições de IP
+    // (IP seria passado via context ou parâmetro adicional)
+    
+    // Verificar rate limiting
+    err := token.CheckRateLimit()
+    if err != nil {
+        return err
+    }
+    
+    // Verificar janela de tempo
+    err = token.CheckTimeWindow()
+    if err != nil {
+        return err
+    }
+    
+    // Verificar via OpenFGA
+    allowed, err := s.authzService.CheckPermission(ctx, 
+        fmt.Sprintf("token:%s", token.ID), 
+        fmt.Sprintf("can_%s_with_token", action), 
+        resourceType, 
+        resourceID)
+    if err != nil {
+        return err
+    }
+    
+    if !allowed {
+        return errors.New("token authorization failed")
+    }
+    
+    return nil
 }
 
-type CreateTagRequest struct {
-    Name        string   `json:"name" validate:"required,min=1,max=50"`
-    Description string   `json:"description,omitempty"`
-    Color       string   `json:"color,omitempty" validate:"omitempty,hexcolor"`
-    Category    string   `json:"category,omitempty"`
+func (s *TokenService) RevokeToken(ctx context.Context, userID, tokenID string) error {
+    token, err := s.tokenRepo.GetByID(ctx, tokenID)
+    if err != nil {
+        return err
+    }
+    
+    // Verificar se o usuário pode revogar este token
+    if token.CreatedBy != userID {
+        // Verificar se é admin do tenant
+        allowed, err := s.authzService.CheckPermission(ctx, userID, "admin", "tenant", token.TenantID)
+        if err != nil {
+            return err
+        }
+        if !allowed {
+            return errors.New("permission denied")
+        }
+    }
+    
+    // Revogar token
+    token.Revoke()
+    err = s.tokenRepo.Update(ctx, token)
+    if err != nil {
+        return err
+    }
+    
+    // Remover relacionamentos do OpenFGA
+    err = s.removeTokenRelationships(ctx, token)
+    if err != nil {
+        return err
+    }
+    
+    // Log de auditoria
+    s.auditRepo.Create(ctx, &entity.AuditLog{
+        TenantID:     token.TenantID,
+        UserID:       userID,
+        Action:       "token_revoked",
+        ResourceType: "token",
+        ResourceID:   token.ID,
+        ResourceName: token.Name,
+        Result:       entity.AuditResultSuccess,
+        Risk:         entity.RiskMedium,
+        Timestamp:    time.Now(),
+    })
+    
+    return nil
 }
 
-type VaultResponse struct {
-    ID           string                 `json:"id"`
-    Name         string                 `json:"name"`
-    Description  string                 `json:"description,omitempty"`
-    Icon         string                 `json:"icon,omitempty"`
-    Color        string                 `json:"color,omitempty"`
-    Tags         []TagResponse          `json:"tags"`
-    SecretsCount int                    `json:"secretsCount"`
-    Permissions  []string               `json:"permissions"`
-    CreatedAt    time.Time              `json:"createdAt"`
-    UpdatedAt    time.Time              `json:"updatedAt"`
+func (s *TokenService) generateToken() (string, string, error) {
+    // Gerar token de 32 bytes
+    tokenBytes := make([]byte, 32)
+    _, err := rand.Read(tokenBytes)
+    if err != nil {
+        return "", "", err
+    }
+    
+    tokenValue := hex.EncodeToString(tokenBytes)
+    hashedToken := s.hashToken(tokenValue)
+    
+    return tokenValue, hashedToken, nil
 }
 
-type TagResponse struct {
-    ID          string     `json:"id"`
-    Name        string     `json:"name"`
-    Color       string     `json:"color,omitempty"`
-    Category    string     `json:"category,omitempty"`
-    Type        string     `json:"type"`
-    UsageCount  int        `json:"usage_count"`
-}
-```
-
-## 📈 Considerações de Performance
-
-### 1. **Índices de Banco**
-```go
-// Firestore indexes configuration
-type FirestoreIndex struct {
-    Collection string
-    Fields     []IndexField
+func (s *TokenService) hashToken(token string) string {
+    hash := sha256.Sum256([]byte(token))
+    return hex.EncodeToString(hash[:])
 }
 
-type IndexField struct {
-    Name       string
-    Direction  string // ASC, DESC
+func (s *TokenService) createTokenRelationships(ctx context.Context, token *entity.Token) error {
+    // Criar relacionamentos no OpenFGA
+    // Implementação específica do OpenFGA seria feita aqui
+    return nil
 }
 
-var RequiredIndexes = []FirestoreIndex{
-    {
-        Collection: "vaults",
-        Fields: []IndexField{
-            {Name: "tenantId", Direction: "ASC"},
-            {Name: "isActive", Direction: "ASC"},
-            {Name: "updatedAt", Direction: "DESC"},
-        },
-    },
-    // ... more indexes
-}
-```
-
-### 2. **Cache Strategy**
-```go
-type CacheService struct {
-    redis        *redis.Client
-    defaultTTL   time.Duration
+func (s *TokenService) removeTokenRelationships(ctx context.Context, token *entity.Token) error {
+    // Remover relacionamentos no OpenFGA
+    // Implementação específica do OpenFGA seria feita aqui
+    return nil
 }
 
-func (c *CacheService) CacheUserPermissions(
-    ctx context.Context,
-    userID string,
-    permissions map[string]bool,
-) error {
-    key := fmt.Sprintf("permissions:%s", userID)
-    return c.redis.Set(ctx, key, permissions, c.defaultTTL).Err()
-}
-```
-
-## 🔧 Configuração
-
-### Config Struct
-
-```go
-package config
-
-type Config struct {
-    Server    ServerConfig    `yaml:"server"`
-    Firebase  FirebaseConfig  `yaml:"firebase"`
-    OpenFGA   OpenFGAConfig   `yaml:"openfga"`
-    Redis     RedisConfig     `yaml:"redis"`
-    Security  SecurityConfig  `yaml:"security"`
+type CreateTokenRequest struct {
+    Name         string                      `json:"name" validate:"required,min=2,max=100"`
+    Description  string                      `json:"description,omitempty"`
+    VaultIDs     []string                    `json:"vaultIds" validate:"required,min=1"`
+    Permissions  entity.TokenPermissions     `json:"permissions" validate:"required"`
+    Restrictions entity.TokenRestrictions    `json:"restrictions"`
+    Security     entity.TokenSecurity        `json:"security"`
+    ExpiresAt    *time.Time                  `json:"expiresAt,omitempty"`
 }
 
-type ServerConfig struct {
-    Port         int           `yaml:"port"`
-    Host         string        `yaml:"host"`
-    ReadTimeout  time.Duration `yaml:"readTimeout"`
-    WriteTimeout time.Duration `yaml:"writeTimeout"`
+type UpdateTokenRequest struct {
+    Name         string                      `json:"name,omitempty" validate:"omitempty,min=2,max=100"`
+    Description  string                      `json:"description,omitempty"`
+    Permissions  entity.TokenPermissions     `json:"permissions,omitempty"`
+    Restrictions entity.TokenRestrictions    `json:"restrictions,omitempty"`
+    Security     entity.TokenSecurity        `json:"security,omitempty"`
+    IsActive     *bool                       `json:"isActive,omitempty"`
 }
 
-type FirebaseConfig struct {
-    ProjectID        string `yaml:"projectId"`
-    CredentialsPath  string `yaml:"credentialsPath"`
-    DatabaseURL      string `yaml:"databaseUrl"`
+type TokenResponse struct {
+    ID           string                      `json:"id"`
+    Name         string                      `json:"name"`
+    Description  string                      `json:"description,omitempty"`
+    VaultIDs     []string                    `json:"vaultIds"`
+    Permissions  entity.TokenPermissions     `json:"permissions"`
+    Restrictions entity.TokenRestrictions    `json:"restrictions"`
+    Security     entity.TokenSecurity        `json:"security"`
+    Usage        entity.TokenUsage           `json:"usage"`
+    IsActive     bool                        `json:"isActive"`
+    IsRevoked    bool                        `json:"isRevoked"`
+    CreatedAt    time.Time                   `json:"createdAt"`
+    UpdatedAt    time.Time                   `json:"updatedAt"`
+    ExpiresAt    *time.Time                  `json:"expiresAt,omitempty"`
+    LastUsedAt   *time.Time                  `json:"lastUsedAt,omitempty"`
 }
 
-type OpenFGAConfig struct {
-    Host    string `yaml:"host"`
-    Port    int    `yaml:"port"`
-    StoreID string `yaml:"storeId"`
+type TokenCreateResponse struct {
+    Token     TokenResponse                 `json:"token"`
+    TokenValue string                       `json:"tokenValue"` // Retornado apenas na criação
+    Warning   string                        `json:"warning,omitempty"`
 }
 
-type SecurityConfig struct {
-    JWTSecret       string        `yaml:"jwtSecret"`
-    EncryptionKey   string        `yaml:"encryptionKey"`
-    SessionTimeout  time.Duration `yaml:"sessionTimeout"`
-    MFARequired     bool          `yaml:"mfaRequired"`
+type TokenUsageResponse struct {
+    TokenID         string                  `json:"tokenId"`
+    TotalRequests   int                     `json:"totalRequests"`
+    SuccessfulReqs  int                     `json:"successfulReqs"`
+    FailedReqs      int                     `json:"failedReqs"`
+    RateLimitHits   int                     `json:"rateLimitHits"`
+    LastUsedAt      *time.Time              `json:"lastUsedAt,omitempty"`
+    LastRequestIP   string                  `json:"lastRequestIP,omitempty"`
+    IsActive        bool                    `json:"isActive"`
+    IsExpired       bool                    `json:"isExpired"`
 }
-```
-
-## 🏷️ Sistema de Tags
+````markdown
+## 🔑 Sistema de Tokens para Automação
 
 ### Características
 
-1. **Limite de 5 tags por vault/objeto** - Para facilitar organização e pesquisa
-2. **Tags predefinidas** - Sistema fornece tags comuns para evitar duplicatas
-3. **Normalização automática** - Nomes são normalizados (lowercase, trim) para consistência
-4. **Contagem de uso** - Tracking de quantas vezes cada tag é usada
-5. **Categorização** - Tags organizadas por categoria (security, status, priority, department)
+1. **Tokens com Permissões Específicas** - Cada token pode ter permissões granulares (read, write, manage, etc.)
+2. **Associação a Vaults** - Tokens são associados a vaults específicos
+3. **Restrições de Acesso** - IP whitelist, rate limiting, janelas de tempo
+4. **Controle de Expiração** - Tokens podem ter data de expiração
+5. **Auditoria Completa** - Todas as operações com tokens são auditadas
+6. **Revogação Instantânea** - Tokens podem ser revogados imediatamente
 
-### Tags Predefinidas do Sistema
+### Tipos de Tokens
 
 ```go
-// Tags de Segurança
-"confidential" - Informações confidenciais (#FF5722)
-"public" - Informações públicas (#4CAF50)
-"internal" - Uso interno apenas (#FF9800)
+// Permissões de Token
+type TokenPermissions struct {
+    CanRead    bool     // Ler segredos
+    CanWrite   bool     // Escrever/editar segredos
+    CanDelete  bool     // Deletar segredos
+    CanManage  bool     // Gerenciar vault
+    CanBackup  bool     // Fazer backup
+    CanAudit   bool     // Acessar logs de auditoria
+    ReadOnly   bool     // Força modo somente leitura
+    Scopes     []string // Operações específicas permitidas
+}
 
-// Tags de Status
-"draft" - Rascunho (#9E9E9E)
-"approved" - Aprovado (#4CAF50)
-"review" - Em revisão (#FF9800)
-"archived" - Arquivado (#795548)
-
-// Tags de Prioridade
-"important" - Importante (#F44336)
-"urgent" - Urgente (#E91E63)
-
-// Tags de Departamento
-"financial" - Financeiro (#009688)
-"legal" - Jurídico (#673AB7)
-"hr" - Recursos Humanos (#3F51B5)
-"marketing" - Marketing (#E91E63)
-"technical" - Técnico (#607D8B)
+// Restrições de Token
+type TokenRestrictions struct {
+    IPWhitelist   []string        // IPs permitidos
+    RateLimit     TokenRateLimit  // Limite de requisições
+    TimeWindow    TokenTimeWindow // Janela de tempo permitida
+    Environment   []string        // Ambientes permitidos
+}
 ```
 
 ### Fluxo de Uso
 
-1. **Criação de Vault/Objeto**:
-   - Sistema sugere tags existentes baseado no nome/tipo
-   - Usuário pode selecionar até 5 tags
-   - Novas tags são criadas automaticamente se não existirem
+1. **Criação de Token**:
+   - Usuário cria token com permissões específicas
+   - Sistema gera token único e hash
+   - Relacionamentos são criados no OpenFGA
 
-2. **Busca e Filtro**:
-   - Filtros por tag para encontrar rapidamente recursos
-   - Autocomplete com tags existentes
-   - Pesquisa por categoria de tag
+2. **Validação de Token**:
+   - Sistema valida hash do token
+   - Verifica se não está revogado/expirado
+   - Aplica restrições (IP, rate limit, etc.)
 
-3. **Gestão de Tags**:
-   - Admins podem gerenciar tags personalizadas
-   - Estatísticas de uso de tags
-   - Limpeza automática de tags não utilizadas
+3. **Autorização**:
+   - Verifica permissões específicas do token
+   - Consulta OpenFGA para autorização
+   - Registra uso para auditoria
+
+4. **Revogação**:
+   - Token pode ser revogado pelo dono ou admin
+   - Relacionamentos são removidos do OpenFGA
+   - Ação é auditada
+
+### Exemplos de Uso
+
+#### Token de CI/CD (Somente Leitura)
+```go
+token := &entity.Token{
+    Name: "CI/CD Pipeline",
+    Permissions: entity.TokenPermissions{
+        CanRead:  true,
+        ReadOnly: true,
+    },
+    Restrictions: entity.TokenRestrictions{
+        IPWhitelist: []string{"192.168.1.10", "10.0.0.5"},
+        RateLimit: entity.TokenRateLimit{
+            Enabled: true,
+            RequestsPerHour: 100,
+            RequestsPerDay: 1000,
+        },
+        Environment: []string{"prod", "staging"},
+    },
+    ExpiresAt: &time.Time{}, // 90 dias
+}
+```
+
+#### Token de Backup
+```go
+token := &entity.Token{
+    Name: "Backup Service",
+    Permissions: entity.TokenPermissions{
+        CanRead:   true,
+        CanBackup: true,
+    },
+    Restrictions: entity.TokenRestrictions{
+        IPWhitelist: []string{"10.0.0.100"},
+        TimeWindow: entity.TokenTimeWindow{
+            Enabled: true,
+            StartTime: "02:00",
+            EndTime: "06:00",
+            DaysOfWeek: []string{"sun", "wed"},
+        },
+    },
+}
+```
+
+#### Token de Desenvolvimento
+```go
+token := &entity.Token{
+    Name: "Development Team",
+    Permissions: entity.TokenPermissions{
+        CanRead:  true,
+        CanWrite: true,
+    },
+    Restrictions: entity.TokenRestrictions{
+        RateLimit: entity.TokenRateLimit{
+            Enabled: true,
+            RequestsPerHour: 50,
+            BurstLimit: 10,
+        },
+        Environment: []string{"dev", "staging"},
+    },
+}
+```
+
+### Monitoramento e Auditoria
+
+#### Métricas de Token
+- Total de requisições
+- Requisições bem-sucedidas vs falhadas
+- Rate limit hits
+- Último uso
+- IPs de origem
+
+#### Logs de Auditoria
+- Criação/revogação de tokens
+- Uso de tokens
+- Violações de restrições
+- Tentativas de acesso negadas
+
+### Segurança
+
+#### Boas Práticas
+1. **Princípio do Menor Privilégio** - Tokens devem ter apenas as permissões necessárias
+2. **Rotação Regular** - Tokens devem ser rotacionados periodicamente
+3. **Monitoramento Ativo** - Alertas para uso suspeito
+4. **Revogação Imediata** - Capacidade de revogar tokens comprometidos
+5. **Auditoria Completa** - Logs de todas as operações
+
+#### Controles de Segurança
+- Hash SHA-256 para armazenamento
+- Tokens únicos de 32 bytes
+- Verificação de IP whitelist
+- Rate limiting configurable
+- Janelas de tempo restritas
+- Controle de ambiente (dev/prod)
+
+### Integração com OpenFGA
+
+#### Relacionamentos de Token
+```
+token:ci-cd-token-123
+├── owner: user:alice
+├── vault: vault:prod-secrets
+├── can_read_secrets: user:system
+├── read_only: user:system
+└── production: user:system
+```
+
+#### Verificações de Autorização
+```bash
+# Verificar se token pode ler vault
+curl -X POST /stores/{store_id}/check \
+  -d '{
+    "tuple_key": {
+      "user": "token:ci-cd-token-123",
+      "relation": "can_read_via_token",
+      "object": "vault:prod-secrets"
+    }
+  }'
+```
+
+### API de Tokens
+
+#### Endpoints Principais
+- `POST /tokens` - Criar novo token
+- `GET /tokens` - Listar tokens do usuário
+- `GET /tokens/{id}` - Obter detalhes do token
+- `PUT /tokens/{id}` - Atualizar token
+- `DELETE /tokens/{id}` - Revogar token
+- `POST /tokens/{id}/revoke` - Revogar token
+- `GET /tokens/{id}/usage` - Estatísticas de uso
+
+#### Autenticação de Token
+```bash
+# Usar token para acessar API
+curl -H "Authorization: Bearer lockari_token_abc123..." \
+  -X GET /api/v1/vaults/vault-123/secrets
+```
+
+Este sistema de tokens fornece uma base sólida para automação, mantendo a segurança e controle de acesso granular necessários para um sistema de gerenciamento de segredos.

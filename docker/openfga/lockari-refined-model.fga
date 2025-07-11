@@ -67,6 +67,7 @@ type vault
     define downloader: [user, group#active_member]
     define tenant: [tenant]
     define external_guest: [user]  # Usuários de outros tenants (enterprise)
+    define api_token: [token]  # Tokens de API para automação
     
     # === PERMISSÕES BÁSICAS ===
     
@@ -76,18 +77,18 @@ type vault
     
     # READ: Ver conteúdo completo dos segredos
     # Inclui automaticamente VIEW
-    define can_read: reader or writer or admin or owner or active_member from tenant
+    define can_read: reader or writer or admin or owner or active_member from tenant or can_read_with_token from api_token
     
     # COPY: Copiar segredos para clipboard/área de transferência
     # Útil para usar em outras aplicações
-    define can_copy: copier or reader or writer or admin or owner
+    define can_copy: copier or reader or writer or admin or owner or can_read_with_token from api_token
     
     # DOWNLOAD: Baixar/exportar segredos em arquivos
     # Mais restritivo que copy por criar arquivos persistentes
-    define can_download: downloader or reader or writer or admin or owner
+    define can_download: downloader or reader or writer or admin or owner or can_read_with_token from api_token
     
     # WRITE: Criar, editar, atualizar segredos
-    define can_write: writer or admin or owner
+    define can_write: writer or admin or owner or can_write_with_token from api_token
     
     # DELETE: Remover segredos
     define can_delete: admin or owner
@@ -96,7 +97,14 @@ type vault
     define can_share: admin or owner
     
     # MANAGE: Gerenciar configurações do vault, permissões, etc.
-    define can_manage: admin or owner
+    define can_manage: admin or owner or can_manage_with_token from api_token
+    
+    # === PERMISSÕES PARA TOKENS DE API ===
+    
+    # Tokens podem ter permissões específicas limitadas
+    define can_read_via_token: can_read and can_read_with_token from api_token
+    define can_write_via_token: can_write and can_write_with_token from api_token
+    define can_manage_via_token: can_manage and can_manage_with_token from api_token
     
     # === PERMISSÕES PARA CONVIDADOS EXTERNOS (Enterprise only) ===
     
@@ -311,3 +319,48 @@ type session
     define can_use: user and mfa_verified and not suspicious
     define can_terminate: user or admin from tenant
     define can_audit: admin from tenant or system
+
+# Token de acesso para automação
+type token
+  relations
+    define owner: [user, group#active_member]
+    define vault: [vault]
+    define tenant: [tenant]
+    define service: [user]  # Serviço/aplicação que usa o token
+    define expires: [user]  # Token com expiração
+    define read_only: [user]  # Token somente leitura
+    define scope_limited: [user]  # Token com escopo limitado
+    define production: [user]  # Token para ambiente de produção
+    define revoked: [user]  # Token revogado
+    define rate_limited: [user]  # Token com rate limiting
+    
+    # Permissões específicas do token
+    define can_read_secrets: [user]
+    define can_write_secrets: [user]
+    define can_manage_vault: [user]
+    define can_audit: [user]
+    define can_backup: [user]
+    
+    # Verificações de validade
+    define is_valid: not revoked and not expires
+    define is_active: is_valid and owner
+    
+    # Operações básicas com tokens
+    define can_use: is_active and (can_read_secrets or can_write_secrets or can_manage_vault)
+    define can_read_with_token: is_active and can_read_secrets and can_read from vault
+    define can_write_with_token: is_active and can_write_secrets and can_write from vault
+    define can_manage_with_token: is_active and can_manage_vault and can_manage from vault
+    define can_audit_with_token: is_active and can_audit and can_read from audit_log
+    define can_backup_with_token: is_active and can_backup and can_create from backup
+    
+    # Operações administrativas do token
+    define can_revoke: owner or admin from tenant
+    define can_regenerate: owner
+    define can_extend_expiry: owner
+    define can_view_usage: owner or admin from tenant
+    define can_configure_rate_limit: owner or admin from tenant
+    
+    # Restrições por ambiente
+    define can_use_in_production: can_use and production and owner
+    define can_use_readonly: can_use and read_only and can_read_secrets
+    define can_use_limited_scope: can_use and scope_limited and (can_read_secrets or can_write_secrets)
