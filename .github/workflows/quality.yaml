@@ -2,9 +2,7 @@ name: Build
 on:
   push:
     branches:
-      - main
-      - develop
-      - feat/*
+      - disabled
   pull_request:
     types: [opened, synchronize, reopened]
 jobs:
