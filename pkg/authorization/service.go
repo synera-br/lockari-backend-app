@@ -314,6 +314,37 @@ func (s *Service) GetVaultUsers(ctx context.Context, vaultID string) ([]string, 
 	return []string{}, fmt.Errorf("not implemented: get vault users")
 }
 
+// SetupTenant sets up a new tenant with an owner.
+func (s *Service) SetupTenant(ctx context.Context, tenantID, ownerID string, features []PlanFeature) error {
+	if tenantID == "" || ownerID == "" {
+		return fmt.Errorf("tenantID and ownerID are required")
+	}
+
+	tuples := []Tuple{
+		{
+			User:     FormatUser(ownerID),
+			Relation: "owner",
+			Object:   FormatTenant(tenantID),
+		},
+		{
+			User:     FormatUser(ownerID),
+			Relation: "admin",
+			Object:   FormatTenant(tenantID),
+		},
+	}
+
+	writeReq := &WriteRequest{
+		Tuples: tuples,
+	}
+
+	err := s.writeRelationship(ctx, writeReq)
+	if err != nil {
+		return fmt.Errorf("failed to setup tenant: %w", err)
+	}
+
+	return nil
+}
+
 // HealthCheck verifica a saúde do serviço
 func (s *Service) HealthCheck(ctx context.Context) *HealthCheckResponse {
 	return s.client.HealthCheck(ctx)
@@ -321,14 +352,22 @@ func (s *Service) HealthCheck(ctx context.Context) *HealthCheckResponse {
 
 // writeRelationship escreve uma relação no OpenFGA
 func (s *Service) writeRelationship(ctx context.Context, req *WriteRequest) error {
-	// TODO: Implementar quando o client suportar write operations
-	return fmt.Errorf("not implemented: write relationship")
+	_, err := s.client.Write(ctx, req)
+	if err != nil {
+		s.logError("Failed to write relationship", err)
+		return fmt.Errorf("failed to write relationship: %w", err)
+	}
+	return nil
 }
 
 // deleteRelationship remove uma relação do OpenFGA
 func (s *Service) deleteRelationship(ctx context.Context, req *DeleteRequest) error {
-	// TODO: Implementar quando o client suportar delete operations
-	return fmt.Errorf("not implemented: delete relationship")
+	_, err := s.client.Delete(ctx, req)
+	if err != nil {
+		s.logError("Failed to delete relationship", err)
+		return fmt.Errorf("failed to delete relationship: %w", err)
+	}
+	return nil
 }
 
 // auditPermissionCheck registra uma verificação de permissão

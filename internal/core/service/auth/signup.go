@@ -11,15 +11,17 @@ import (
 	"github.com/synera-br/lockari-backend-app/pkg/database"
 	"github.com/synera-br/lockari-backend-app/pkg/tokengen"
 	"github.com/synera-br/lockari-backend-app/pkg/utils"
+	"github.com/synera-br/lockari-backend-app/pkg/authorization"
 )
 
 type SignupEvent struct {
 	repo     entity.SignupEventRepository
 	auth     authenticator.Authenticator
 	tokenJWT tokengen.TokenGenerator
+	authzSvc authorization.LockariAuthorizationService
 }
 
-func InitializeSignupEventService(repo entity.SignupEventRepository, auth authenticator.Authenticator, tokenJWT tokengen.TokenGenerator) (entity.SignupEventService, error) {
+func InitializeSignupEventService(repo entity.SignupEventRepository, auth authenticator.Authenticator, tokenJWT tokengen.TokenGenerator, authzSvc authorization.LockariAuthorizationService) (entity.SignupEventService, error) {
 
 	if repo == nil {
 		return nil, core.ErrRepositoryNotFound("SignupEventRepository")
@@ -33,10 +35,15 @@ func InitializeSignupEventService(repo entity.SignupEventRepository, auth authen
 		return nil, core.ErrRepositoryNotFound("TokenGenerator")
 	}
 
+	if authzSvc == nil {
+		return nil, core.ErrRepositoryNotFound("LockariAuthorizationService")
+	}
+
 	return &SignupEvent{
 		repo:     repo,
 		auth:     auth,
 		tokenJWT: tokenJWT,
+		authzSvc: authzSvc,
 	}, nil
 }
 
@@ -93,6 +100,22 @@ func (s *SignupEvent) Create(ctx context.Context, signupData *entity.Signup) (en
 	err = s.auth.SetTenantId(ctx, signupData.User.Uid, tenantId)
 	if err != nil {
 		return nil, core.ErrGenericError("Failed to set tenant ID")
+	}
+
+	// SETUP TENANT IN OPENFGA
+	err = s.authzSvc.SetupTenant(ctx, tenantId, signupData.User.Uid, nil)
+	if err != nil {
+		// Salvar o erro original antes de tentar rollback
+		originalErr := err
+
+		// Tentar rollback do tenant
+		if rollbackErr := s.auth.SetTenantRollback(ctx, signupData.User.Uid, ""); rollbackErr != nil {
+			// Log o erro de rollback, mas retorna o erro original
+			log.Printf("Failed to rollback tenant for user %s: %v", signupData.User.Uid, rollbackErr)
+		}
+
+		// Sempre retorna o erro original, não o erro do rollback
+		return nil, originalErr
 	}
 
 	// CONVERT SIGNUP TO MAP

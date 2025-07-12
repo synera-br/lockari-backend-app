@@ -30,6 +30,7 @@ import (
 	httpserver "github.com/synera-br/lockari-backend-app/pkg/http_server"
 	"github.com/synera-br/lockari-backend-app/pkg/message_queue"
 	"github.com/synera-br/lockari-backend-app/pkg/tokengen"
+	"github.com/synera-br/lockari-backend-app/pkg/authorization"
 )
 
 func main() {
@@ -75,7 +76,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	signup, err := initializeSignup(db, authClient, tokenJWT)
+	authzSvc, err := initializeAuthorization(cfg.Fields["openfga"])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	signup, err := initializeSignup(db, authClient, tokenJWT, authzSvc)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -221,14 +227,14 @@ func initializeAuth(db database.FirebaseDBInterface) (entity.LoginEventService, 
 	return svc, nil
 }
 
-func initializeSignup(db database.FirebaseDBInterface, auth authenticator.Authenticator, tokenJWT tokengen.TokenGenerator) (entity_auth.SignupEventService, error) {
+func initializeSignup(db database.FirebaseDBInterface, auth authenticator.Authenticator, tokenJWT tokengen.TokenGenerator, authzSvc authorization.LockariAuthorizationService) (entity_auth.SignupEventService, error) {
 
 	repo, err := repo_auth.InitializeSignupEventRepository(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize signup event repository: %w", err)
 	}
 
-	svc, err := svc_auth.InitializeSignupEventService(repo, auth, tokenJWT)
+	svc, err := svc_auth.InitializeSignupEventService(repo, auth, tokenJWT, authzSvc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize signup event service: %w", err)
 	}
@@ -249,4 +255,33 @@ func initializeAuditEvent(db database.FirebaseDBInterface, auth authenticator.Au
 
 	return svc, nil
 
+}
+
+func initializeAuthorization(openfgaField interface{}) (authorization.LockariAuthorizationService, error) {
+	var config authorization.Config
+	b, err := json.Marshal(openfgaField)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal openfga config: %w", err)
+	}
+
+	if err := json.Unmarshal(b, &config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal openfga config: %w", err)
+	}
+
+	client, err := authorization.NewOpenFGAClient(&config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize openfga client: %w", err)
+	}
+
+	opts := authorization.ServiceOptions{
+		Client: client,
+		Config: &config,
+		Logger: nil, // TODO: Initialize logger
+		Audit:  nil, // TODO: Initialize audit service
+		Cache:  nil, // TODO: Initialize cache
+	}
+
+	svc := authorization.NewService(opts)
+
+	return svc, nil
 }
