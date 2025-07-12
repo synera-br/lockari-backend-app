@@ -275,7 +275,7 @@ type Config struct {
     
     // === AUTHENTICATION ===
     APITokenIssuer   string `mapstructure:"api_token_issuer"`
-    APIAudience      string `mapstructure:"api_audience"`
+    APIudience      string `mapstructure:"api_audience"`
     ClientID         string `mapstructure:"client_id"`
     ClientSecret     string `mapstructure:"client_secret"`
     Scopes           string `mapstructure:"scopes"`
@@ -422,14 +422,12 @@ func NewClient(config *Config, logger *slog.Logger) (*Client, error) {
     if config.ClientID != "" && config.ClientSecret != "" {
         credentials = &credentials.Credentials{
             Method: credentials.CredentialsMethodClientCredentials,
-            Config: &credentials.Config{
-                ClientCredentialsConfig: &credentials.ClientCredentialsConfig{
-                    TokenIssuer:   config.APITokenIssuer,
-                    TokenAudience: config.APIAudience,
-                    ClientId:      config.ClientID,
-                    ClientSecret:  config.ClientSecret,
-                    Scopes:        strings.Split(config.Scopes, " "),
-                },
+            Config: &credentials.ClientCredentialsConfig{
+                TokenIssuer:   config.APITokenIssuer,
+                TokenAudience: config.APIudience,
+                ClientId:      config.ClientID,
+                ClientSecret:  config.ClientSecret,
+                Scopes:        strings.Split(config.Scopes, " "),
             },
         }
     } else {
@@ -741,7 +739,116 @@ func (s *Service) validateCheckRequest(req *CheckRequest) error {
 }
 ```
 
-Esta implementação técnica detalhada mostra **por que** cada componente é necessário e **como** eles trabalham juntos para criar um sistema robusto de autorização. O próximo passo seria implementar cada arquivo seguindo essas especificações.
+## 🔗 Como Acessar a Interface LockariAuthorizationService
+
+### 1. Configuração Rápida
+
+```go
+package main
+
+import (
+    "context"
+    "log/slog"
+    "time"
+    
+    "github.com/synera-br/lockari-backend-app/pkg/authorization"
+)
+
+func main() {
+    // 1. Criar configuração
+    config := &authorization.Config{
+        APIURL:       "http://localhost:8080",
+        StoreID:      "01HXSJ9QXKV8J9DK8V7S9QXKV8",
+        Timeout:      30 * time.Second,
+        CacheEnabled: true,
+        CacheTTL:     5 * time.Minute,
+        AuditEnabled: true,
+    }
+
+    // 2. Criar logger adapter
+    logger := authorization.NewSlogAdapter(slog.Default())
+
+    // 3. Criar serviço Lockari (implementação da interface)
+    lockariService := authorization.NewLockariService(authorization.LockariServiceOptions{
+        Config: config,
+        Logger: logger,
+    })
+
+    // 4. Agora você tem acesso à interface LockariAuthorizationService
+    ctx := context.Background()
+    
+    // Exemplo de uso
+    canAccess, err := lockariService.CanAccessVault(ctx, "user123", "vault456", authorization.VaultPermissionRead)
+    if err != nil {
+        log.Printf("Erro: %v", err)
+        return
+    }
+    
+    if canAccess {
+        log.Printf("Usuário pode acessar o vault")
+    } else {
+        log.Printf("Usuário NÃO pode acessar o vault")
+    }
+}
+```
+
+### 2. Integração com Handlers
+
+```go
+type VaultHandler struct {
+    authService authorization.LockariAuthorizationService
+}
+
+func NewVaultHandler(authService authorization.LockariAuthorizationService) *VaultHandler {
+    return &VaultHandler{
+        authService: authService,
+    }
+}
+
+func (h *VaultHandler) GetVault(c *gin.Context) {
+    userID := c.GetString("user_id")
+    vaultID := c.Param("id")
+    
+    canAccess, err := h.authService.CanAccessVault(c.Request.Context(), userID, vaultID, authorization.VaultPermissionRead)
+    if err != nil {
+        c.JSON(500, gin.H{"error": "authorization check failed"})
+        return
+    }
+    
+    if !canAccess {
+        c.JSON(403, gin.H{"error": "forbidden"})
+        return
+    }
+    
+    // Lógica do handler...
+    c.JSON(200, gin.H{"message": "success"})
+}
+```
+
+### 3. Principais Métodos da Interface
+
+#### Operações de Vault
+- `CanAccessVault()` - Verificar permissão de acesso
+- `SetupVault()` - Configurar novo vault
+- `ShareVault()` - Compartilhar vault com usuário
+- `ListAccessibleVaults()` - Listar vaults acessíveis
+
+#### Operações de Tenant
+- `SetupTenant()` - Configurar novo tenant
+- `AddUserToTenant()` - Adicionar usuário ao tenant
+- `RemoveUserFromTenant()` - Remover usuário do tenant
+
+#### Operações de Token
+- `CreateAPIToken()` - Criar token de API
+- `CheckTokenPermission()` - Verificar permissão do token
+- `RevokeToken()` - Revogar token
+
+#### Operações de Auditoria
+- `GetAuditLogs()` - Obter logs de auditoria
+
+### 4. Exemplo Completo de Uso
+
+Veja o arquivo `examples/lockari_service_usage.go` para um exemplo completo e funcional.
 
 ## 📋 Benefícios da Implementação
 

@@ -41,24 +41,24 @@ type PaginationData struct {
 // AuditQuery representa uma consulta para buscar logs de auditoria
 type AuditLogQuery struct {
 	// Filtros básicos
-	UserID       string     `json:"userId,omitempty"`
-	UserEmail    string     `json:"userEmail,omitempty"`
-	ResourceType string     `json:"resourceType,omitempty"`
-	ResourceName string     `json:"resourceName,omitempty"`
-	Action       string     `json:"action,omitempty"`
-	
+	UserID       string `json:"userId,omitempty"`
+	UserEmail    string `json:"userEmail,omitempty"`
+	ResourceType string `json:"resourceType,omitempty"`
+	ResourceName string `json:"resourceName,omitempty"`
+	Action       string `json:"action,omitempty"`
+
 	// Filtros de data
 	StartTime *time.Time `json:"startTime,omitempty"`
 	EndTime   *time.Time `json:"endTime,omitempty"`
-	
+
 	// Paginação
 	Page  int `json:"page,omitempty"`
 	Limit int `json:"limit,omitempty"`
-	
+
 	// Ordenação
 	SortBy    string `json:"sortBy,omitempty"`    // timestamp, action, resourceType, etc.
 	SortOrder string `json:"sortOrder,omitempty"` // asc, desc
-	
+
 	// Filtros avançados
 	IPAddress string `json:"ipAddress,omitempty"`
 	Success   *bool  `json:"success,omitempty"` // true para permitido, false para negado
@@ -68,19 +68,19 @@ type AuditLogQuery struct {
 type AuditLogService interface {
 	// QueryLogs busca logs de auditoria baseado nos filtros
 	QueryLogs(ctx context.Context, query *AuditLogQuery) (*AuditLogsResponse, error)
-	
+
 	// GetLogByID busca um log específico por ID
 	GetLogByID(ctx context.Context, logID string) (*AuditLogData, error)
-	
+
 	// GetUserActivity busca atividades de um usuário específico
 	GetUserActivity(ctx context.Context, userID string, limit int) (*AuditLogsResponse, error)
-	
+
 	// GetResourceActivity busca atividades de um recurso específico
 	GetResourceActivity(ctx context.Context, resourceType, resourceID string, limit int) (*AuditLogsResponse, error)
-	
+
 	// GetSuspiciousActivity busca atividades suspeitas
 	GetSuspiciousActivity(ctx context.Context, limit int) (*AuditLogsResponse, error)
-	
+
 	// ExportLogs exporta logs para arquivo (CSV, JSON)
 	ExportLogs(ctx context.Context, query *AuditLogQuery, format string) ([]byte, error)
 }
@@ -90,7 +90,7 @@ type AuditLogService interface {
 // ToAuditLogData converte AuditEvent para AuditLogData (formato da API)
 func ToAuditLogData(event *AuditEvent, userEmail string) *AuditLogData {
 	resourceType, resourceName := parseResource(event.Resource)
-	
+
 	return &AuditLogData{
 		ID:           event.ID,
 		ResourceName: resourceName,
@@ -117,46 +117,46 @@ func parseResource(resource string) (resourceType, resourceName string) {
 // formatAction formata a ação para exibição amigável
 func formatAction(action string) string {
 	actionMap := map[string]string{
-		"check_permission":         "Check Permission",
-		"grant_permission":         "Grant Permission",
-		"revoke_permission":        "Revoke Permission",
-		"create_vault":             "Create Vault",
-		"update_vault":             "Update Vault",
-		"delete_vault":             "Delete Vault",
-		"share_vault":              "Share Vault",
-		"create_secret":            "Create Secret",
-		"update_secret":            "Update Secret",
-		"delete_secret":            "Delete Secret",
-		"read_secret":              "Read Secret",
-		"copy_secret":              "Copy Secret",
-		"download_secret":          "Download Secret",
-		"create_token":             "Create API Token",
-		"revoke_token":             "Revoke API Token",
-		"login":                    "Login",
-		"logout":                   "Logout",
-		"password_change":          "Password Change",
-		"profile_update":           "Profile Update",
-		"tenant_setup":             "Tenant Setup",
-		"user_invitation":          "User Invitation",
-		"group_create":             "Create Group",
-		"group_update":             "Update Group",
-		"group_delete":             "Delete Group",
-		"external_share_request":   "External Share Request",
-		"external_share_approve":   "External Share Approve",
-		"external_share_reject":    "External Share Reject",
-		"suspicious_activity":      "Suspicious Activity",
-		"failed_login":             "Failed Login",
-		"multiple_failed_logins":   "Multiple Failed Logins",
-		"account_lockout":          "Account Lockout",
-		"permission_escalation":    "Permission Escalation",
-		"bulk_operation":           "Bulk Operation",
-		"system_configuration":     "System Configuration",
+		"check_permission":       "Check Permission",
+		"grant_permission":       "Grant Permission",
+		"revoke_permission":      "Revoke Permission",
+		"create_vault":           "Create Vault",
+		"update_vault":           "Update Vault",
+		"delete_vault":           "Delete Vault",
+		"share_vault":            "Share Vault",
+		"create_secret":          "Create Secret",
+		"update_secret":          "Update Secret",
+		"delete_secret":          "Delete Secret",
+		"read_secret":            "Read Secret",
+		"copy_secret":            "Copy Secret",
+		"download_secret":        "Download Secret",
+		"create_token":           "Create API Token",
+		"revoke_token":           "Revoke API Token",
+		"login":                  "Login",
+		"logout":                 "Logout",
+		"password_change":        "Password Change",
+		"profile_update":         "Profile Update",
+		"tenant_setup":           "Tenant Setup",
+		"user_invitation":        "User Invitation",
+		"group_create":           "Create Group",
+		"group_update":           "Update Group",
+		"group_delete":           "Delete Group",
+		"external_share_request": "External Share Request",
+		"external_share_approve": "External Share Approve",
+		"external_share_reject":  "External Share Reject",
+		"suspicious_activity":    "Suspicious Activity",
+		"failed_login":           "Failed Login",
+		"multiple_failed_logins": "Multiple Failed Logins",
+		"account_lockout":        "Account Lockout",
+		"permission_escalation":  "Permission Escalation",
+		"bulk_operation":         "Bulk Operation",
+		"system_configuration":   "System Configuration",
 	}
-	
+
 	if formatted, exists := actionMap[action]; exists {
 		return formatted
 	}
-	
+
 	// Se não encontrar, formatar automaticamente
 	return strings.Title(strings.ReplaceAll(action, "_", " "))
 }
@@ -166,7 +166,7 @@ func generateResourceLink(resourceType, resourceName string) string {
 	if resourceName == "" {
 		return ""
 	}
-	
+
 	switch resourceType {
 	case "vault":
 		return fmt.Sprintf("/vaults/%s", resourceName)
@@ -188,29 +188,29 @@ func generateResourceLink(resourceType, resourceName string) string {
 // buildDetails constrói os detalhes específicos do evento
 func buildDetails(event *AuditEvent) map[string]interface{} {
 	details := make(map[string]interface{})
-	
+
 	// Adicionar metadados do evento
 	for key, value := range event.Metadata {
 		details[key] = value
 	}
-	
+
 	// Adicionar informações específicas
 	if event.Result != "" {
 		details["result"] = event.Result
 	}
-	
+
 	if event.Duration > 0 {
 		details["duration_ms"] = event.Duration.Milliseconds()
 	}
-	
+
 	if event.RequestID != "" {
 		details["request_id"] = event.RequestID
 	}
-	
+
 	if event.UserAgent != "" {
 		details["user_agent"] = event.UserAgent
 	}
-	
+
 	// Adicionar contexto específico baseado na ação
 	switch event.Action {
 	case "check_permission":
@@ -245,7 +245,7 @@ func buildDetails(event *AuditEvent) map[string]interface{} {
 			details["reason"] = reason
 		}
 	}
-	
+
 	return details
 }
 
@@ -253,30 +253,30 @@ func buildDetails(event *AuditEvent) map[string]interface{} {
 
 // AuditLogFilter representa filtros para busca de logs
 type AuditLogFilter struct {
-	UserIDs      []string   `json:"userIds,omitempty"`
+	UserIDs       []string   `json:"userIds,omitempty"`
 	ResourceTypes []string   `json:"resourceTypes,omitempty"`
-	Actions      []string   `json:"actions,omitempty"`
-	StartTime    *time.Time `json:"startTime,omitempty"`
-	EndTime      *time.Time `json:"endTime,omitempty"`
-	Success      *bool      `json:"success,omitempty"`
-	IPAddresses  []string   `json:"ipAddresses,omitempty"`
-	Severity     []string   `json:"severity,omitempty"`
+	Actions       []string   `json:"actions,omitempty"`
+	StartTime     *time.Time `json:"startTime,omitempty"`
+	EndTime       *time.Time `json:"endTime,omitempty"`
+	Success       *bool      `json:"success,omitempty"`
+	IPAddresses   []string   `json:"ipAddresses,omitempty"`
+	Severity      []string   `json:"severity,omitempty"`
 }
 
 // ===== AUDIT LOG AGGREGATIONS =====
 
 // AuditLogStats representa estatísticas de auditoria
 type AuditLogStats struct {
-	TotalEvents          int64                    `json:"totalEvents"`
-	EventsByAction       map[string]int64         `json:"eventsByAction"`
-	EventsByResourceType map[string]int64         `json:"eventsByResourceType"`
-	EventsByUser         map[string]int64         `json:"eventsByUser"`
-	EventsByDay          map[string]int64         `json:"eventsByDay"`
-	SuccessRate          float64                  `json:"successRate"`
-	SuspiciousEvents     int64                    `json:"suspiciousEvents"`
-	UniqueUsers          int64                    `json:"uniqueUsers"`
-	UniqueIPs            int64                    `json:"uniqueIPs"`
-	LastActivity         time.Time                `json:"lastActivity"`
+	TotalEvents          int64            `json:"totalEvents"`
+	EventsByAction       map[string]int64 `json:"eventsByAction"`
+	EventsByResourceType map[string]int64 `json:"eventsByResourceType"`
+	EventsByUser         map[string]int64 `json:"eventsByUser"`
+	EventsByDay          map[string]int64 `json:"eventsByDay"`
+	SuccessRate          float64          `json:"successRate"`
+	SuspiciousEvents     int64            `json:"suspiciousEvents"`
+	UniqueUsers          int64            `json:"uniqueUsers"`
+	UniqueIPs            int64            `json:"uniqueIPs"`
+	LastActivity         time.Time        `json:"lastActivity"`
 }
 
 // AuditLogTrend representa tendências de auditoria
@@ -308,16 +308,16 @@ type AuditAlert struct {
 type AuditAlertType string
 
 const (
-	AuditAlertTypeMultipleFailedLogins    AuditAlertType = "multiple_failed_logins"
-	AuditAlertTypeUnusualAccess          AuditAlertType = "unusual_access"
-	AuditAlertTypePermissionEscalation   AuditAlertType = "permission_escalation"
-	AuditAlertTypeBulkOperations         AuditAlertType = "bulk_operations"
-	AuditAlertTypeOffHoursAccess         AuditAlertType = "off_hours_access"
-	AuditAlertTypeGeographicAnomaly      AuditAlertType = "geographic_anomaly"
-	AuditAlertTypeRapidOperations        AuditAlertType = "rapid_operations"
-	AuditAlertTypeSystemConfigChange     AuditAlertType = "system_config_change"
-	AuditAlertTypeDataExfiltration       AuditAlertType = "data_exfiltration"
-	AuditAlertTypeUnauthorizedAccess     AuditAlertType = "unauthorized_access"
+	AuditAlertTypeMultipleFailedLogins AuditAlertType = "multiple_failed_logins"
+	AuditAlertTypeUnusualAccess        AuditAlertType = "unusual_access"
+	AuditAlertTypePermissionEscalation AuditAlertType = "permission_escalation"
+	AuditAlertTypeBulkOperations       AuditAlertType = "bulk_operations"
+	AuditAlertTypeOffHoursAccess       AuditAlertType = "off_hours_access"
+	AuditAlertTypeGeographicAnomaly    AuditAlertType = "geographic_anomaly"
+	AuditAlertTypeRapidOperations      AuditAlertType = "rapid_operations"
+	AuditAlertTypeSystemConfigChange   AuditAlertType = "system_config_change"
+	AuditAlertTypeDataExfiltration     AuditAlertType = "data_exfiltration"
+	AuditAlertTypeUnauthorizedAccess   AuditAlertType = "unauthorized_access"
 )
 
 // AuditAlertSeverity representa severidades de alertas
@@ -334,12 +334,12 @@ const (
 
 // AuditLogExportRequest representa uma solicitação de exportação
 type AuditLogExportRequest struct {
-	Query     *AuditLogQuery `json:"query"`
-	Format    string         `json:"format"`    // csv, json, xlsx
-	Fields    []string       `json:"fields"`    // campos específicos para exportar
-	Compress  bool           `json:"compress"`  // gzip compress
-	EmailTo   string         `json:"emailTo"`   // enviar por email
-	FileName  string         `json:"fileName"`  // nome do arquivo
+	Query    *AuditLogQuery `json:"query"`
+	Format   string         `json:"format"`   // csv, json, xlsx
+	Fields   []string       `json:"fields"`   // campos específicos para exportar
+	Compress bool           `json:"compress"` // gzip compress
+	EmailTo  string         `json:"emailTo"`  // enviar por email
+	FileName string         `json:"fileName"` // nome do arquivo
 }
 
 // AuditLogExportResponse representa a resposta da exportação
@@ -360,21 +360,21 @@ func (q *AuditLogQuery) Validate() error {
 	if q.Limit > 1000 {
 		return fmt.Errorf("limit cannot exceed 1000")
 	}
-	
+
 	if q.Limit <= 0 {
 		q.Limit = 50 // default
 	}
-	
+
 	if q.Page <= 0 {
 		q.Page = 1 // default
 	}
-	
+
 	if q.StartTime != nil && q.EndTime != nil {
 		if q.StartTime.After(*q.EndTime) {
 			return fmt.Errorf("start time cannot be after end time")
 		}
 	}
-	
+
 	// Validar ordenação
 	if q.SortBy != "" {
 		validSortFields := []string{"timestamp", "action", "resourceType", "userId", "result"}
@@ -389,11 +389,11 @@ func (q *AuditLogQuery) Validate() error {
 			return fmt.Errorf("invalid sort field: %s", q.SortBy)
 		}
 	}
-	
+
 	if q.SortOrder != "" && q.SortOrder != "asc" && q.SortOrder != "desc" {
 		return fmt.Errorf("sort order must be 'asc' or 'desc'")
 	}
-	
+
 	return nil
 }
 
@@ -402,15 +402,15 @@ func (q *AuditLogQuery) SetDefaults() {
 	if q.Limit <= 0 {
 		q.Limit = 50
 	}
-	
+
 	if q.Page <= 0 {
 		q.Page = 1
 	}
-	
+
 	if q.SortBy == "" {
 		q.SortBy = "timestamp"
 	}
-	
+
 	if q.SortOrder == "" {
 		q.SortOrder = "desc"
 	}
@@ -427,37 +427,37 @@ func (q *AuditLogQuery) CalculateOffset() int {
 func (q *AuditLogQuery) BuildWhereClause() (string, []interface{}) {
 	var conditions []string
 	var args []interface{}
-	
+
 	if q.UserID != "" {
 		conditions = append(conditions, "user_id = ?")
 		args = append(args, q.UserID)
 	}
-	
+
 	if q.ResourceType != "" {
 		conditions = append(conditions, "resource_type = ?")
 		args = append(args, q.ResourceType)
 	}
-	
+
 	if q.Action != "" {
 		conditions = append(conditions, "action = ?")
 		args = append(args, q.Action)
 	}
-	
+
 	if q.StartTime != nil {
 		conditions = append(conditions, "timestamp >= ?")
 		args = append(args, q.StartTime)
 	}
-	
+
 	if q.EndTime != nil {
 		conditions = append(conditions, "timestamp <= ?")
 		args = append(args, q.EndTime)
 	}
-	
+
 	if q.IPAddress != "" {
 		conditions = append(conditions, "client_ip = ?")
 		args = append(args, q.IPAddress)
 	}
-	
+
 	if q.Success != nil {
 		if *q.Success {
 			conditions = append(conditions, "result = 'allowed'")
@@ -465,12 +465,12 @@ func (q *AuditLogQuery) BuildWhereClause() (string, []interface{}) {
 			conditions = append(conditions, "result = 'denied'")
 		}
 	}
-	
+
 	whereClause := ""
 	if len(conditions) > 0 {
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
-	
+
 	return whereClause, args
 }
 
@@ -497,7 +497,7 @@ func IsValidAction(action string) bool {
 		"group_delete", "external_share_request", "external_share_approve",
 		"external_share_reject", "suspicious_activity", "failed_login",
 	}
-	
+
 	for _, validAction := range validActions {
 		if action == validAction {
 			return true

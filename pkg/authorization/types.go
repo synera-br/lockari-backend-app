@@ -170,6 +170,16 @@ const (
 	PlanFeatureAuditLogs           PlanFeature = "audit_logs"
 	PlanFeatureBackup              PlanFeature = "backup"
 	PlanFeatureExternalSharing     PlanFeature = "external_sharing"
+	PlanFeatureVaultLimit          PlanFeature = "vault_limit"
+	PlanFeatureUserLimit           PlanFeature = "user_limit"
+	PlanFeatureUnlimitedVaults     PlanFeature = "unlimited_vaults"
+	PlanFeatureUnlimitedUsers      PlanFeature = "unlimited_users"
+	PlanFeatureAPIAccess           PlanFeature = "api_access"
+	PlanFeatureGroupManagement     PlanFeature = "group_management"
+	PlanFeatureSSO                 PlanFeature = "sso"
+	PlanFeatureAdvancedSecurity    PlanFeature = "advanced_security"
+	PlanFeatureBasicSharing        PlanFeature = "basic_sharing"
+	PlanFeatureAdvancedSharing     PlanFeature = "advanced_sharing"
 )
 
 // AllPlanFeatures retorna todos os recursos válidos
@@ -177,6 +187,10 @@ func AllPlanFeatures() []PlanFeature {
 	return []PlanFeature{
 		PlanFeatureBasic, PlanFeatureAdvancedPermissions, PlanFeatureCrossTenantSharing,
 		PlanFeatureAuditLogs, PlanFeatureBackup, PlanFeatureExternalSharing,
+		PlanFeatureVaultLimit, PlanFeatureUserLimit, PlanFeatureUnlimitedVaults,
+		PlanFeatureUnlimitedUsers, PlanFeatureAPIAccess, PlanFeatureGroupManagement,
+		PlanFeatureSSO, PlanFeatureAdvancedSecurity, PlanFeatureBasicSharing,
+		PlanFeatureAdvancedSharing,
 	}
 }
 
@@ -716,4 +730,35 @@ type AuditQuery struct {
 	Limit     int               `json:"limit,omitempty"`
 	Offset    int               `json:"offset,omitempty"`
 	Filters   map[string]string `json:"filters,omitempty"`
+}
+
+// ===== PLAN TYPES =====
+
+// PlanType representa os tipos de plano
+type PlanType string
+
+const (
+	PlanFree       PlanType = "free"
+	PlanPro        PlanType = "pro"
+	PlanEnterprise PlanType = "enterprise"
+)
+
+// AllPlanTypes retorna todos os tipos de plano válidos
+func AllPlanTypes() []PlanType {
+	return []PlanType{PlanFree, PlanPro, PlanEnterprise}
+}
+
+// IsValid verifica se o tipo de plano é válido
+func (pt PlanType) IsValid() bool {
+	for _, valid := range AllPlanTypes() {
+		if pt == valid {
+			return true
+		}
+	}
+	return false
+}
+
+// String implementa fmt.Stringer
+func (pt PlanType) String() string {
+	return string(pt)
 }
